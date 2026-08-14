@@ -17,12 +17,6 @@ To access/download bathymetry file for MOM6 directly from the thredds server:
 ``` r
 library(reticulate)
 
-# Import Python modules into R variables
-xr   <- import("xarray")
-np   <- import("numpy")
-pd   <- import("pandas")
-time <- import("time")
-
 url <- "https://psl.noaa.gov/thredds/fileServer/Projects/CEFI/regional_mom6/cefi_derivative/northeast_pacific/full_domain/hindcast/monthly/regrid/r20260701/static/ocean_static.deptho.nc"
  dest_file <- "ocean_static.deptho.nc"
 
