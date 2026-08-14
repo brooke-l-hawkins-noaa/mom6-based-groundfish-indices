@@ -1,14 +1,10 @@
----
-output: 
-  github_document:
-    html_preview: false
----
 
 ## Description
 
 Static files necessary for running scripts to process groundfish indices
 
-To access/download bathymetry file for MOM6 directly from the thredds server:
+To access/download bathymetry file for MOM6 directly from the thredds
+server:
 
 ``` r
 library(reticulate)
@@ -23,5 +19,4 @@ url <- "https://psl.noaa.gov/thredds/fileServer/Projects/CEFI/regional_mom6/cefi
  dest_file <- "ocean_static.deptho.nc"
 
 download.file(url, destfile = dest_file, method = "libcurl", mode = "wb")
-
 ```
