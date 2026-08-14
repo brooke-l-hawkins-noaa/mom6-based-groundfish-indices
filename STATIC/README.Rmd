@@ -1,8 +1,10 @@
+---
+output: 
+  github_document:
+    html_preview: false
+---
+
 ## Description
-
-Static files necessary for running scripts to process groundfish indices
-
-Description
 
 Static files necessary for running scripts to process the longitudinal extent of groundfish indices based on 1) isobaths defined by bathymetry data and 2) distance from shore.
 
@@ -27,4 +29,5 @@ url <- "https://psl.noaa.gov/thredds/fileServer/Projects/CEFI/regional_mom6/cefi
  dest_file <- "ocean_static.deptho.nc"
 
 download.file(url, destfile = dest_file, method = "libcurl", mode = "wb")
+
 ```
