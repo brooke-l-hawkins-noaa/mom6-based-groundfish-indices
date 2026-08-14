@@ -17,6 +17,12 @@ xr   <- import("xarray")
 np   <- import("numpy")
 pd   <- import("pandas")
 time <- import("time")
+
+url <- "https://psl.noaa.gov/thredds/fileServer/Projects/CEFI/regional_mom6/cefi_derivative/northeast_pacific/full_domain/hindcast/monthly/regrid/r20260701/static/ocean_static.deptho.nc"
+ dest_file <- "../STATIC/ocean_static.deptho.nc"
+
+download.file(url, destfile = dest_file, method = "libcurl", mode = "wb")
+
 ```
 
 
