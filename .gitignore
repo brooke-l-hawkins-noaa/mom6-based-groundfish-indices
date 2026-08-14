@@ -233,6 +233,12 @@ __marimo__/
 .RData
 .RDataTmp
 
+# Mac system files
+*.DS_store
+
+# Net CDF files
+*.nc
+
 # User-specific files
 .Ruserdata
 
