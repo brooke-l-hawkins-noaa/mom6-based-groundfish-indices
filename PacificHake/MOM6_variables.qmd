@@ -1,0 +1,79 @@
+---
+title: "MOM6_variables"
+format: pdf
+editor: visual
+---
+
+# Setup
+
+
+
+```{r}
+library(reticulate)
+
+# Import Python modules into R variables
+#py_install(c("xarray", "netcdf4", "scipy")) 
+xr   <- import("xarray")
+np   <- import("numpy")
+pd   <- import("pandas")
+time <- import("time")
+```
+
+
+```{r}
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+lifestage_dict <- list(
+  spawn = list( # spawn
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 130,
+    max_depth = 500
+  ), #long extent shelf break
+  egg = list( # egg
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 40,
+    max_lat   = 60,
+    min_depth = 40,
+    max_depth = 60
+  ), #long extent shelf break
+  yolk = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 50, 
+    max_depth = 100 
+  ), #long extent shelf break
+  JAc = list( # JAc
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 34.5,
+    max_lat   = 42.5,
+    min_depth = 30,
+    max_depth = 130
+  ),
+  latelarv = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 31,
+    max_lat   = 37,
+    min_depth = 50,
+    max_depth = 300
+  ),
+  late = list( # late
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 33.5,
+    max_lat   = 34.5,
+    min_depth = 75,
+    max_depth = 275
+  )
+)
+
+```

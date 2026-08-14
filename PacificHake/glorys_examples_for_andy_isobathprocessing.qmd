@@ -1,0 +1,162 @@
+---
+title: "Examples of querying GLORYS datas"
+format: html
+editor: visual
+---
+
+## Downloading – straight Python
+
+This is the approach I'm using the most right now – querying temp file downloads straight from Python. You have to install via <https://pypi.org/project/copernicusmarine/> – I like this because I think it's made by the Copernicus development team and seems very stable.
+
+```{python echo=FALSE}
+# example of 
+copernicusmarine.subset(
+  dataset_id="cmems_mod_glo_phy_my_0.083deg_P1M-m",
+  variables=["thetao"],  # temperature
+  minimum_longitude=-126,
+  maximum_longitude=-115,
+  minimum_latitude=32,
+  maximum_latitude=50,
+  start_datetime="1994-01-01T00:00:00",
+  end_datetime="2024-08-20T23:59:59",
+  output_directory="./copernicus-data",  # Directory to save 
+  output_filename="glorys_data_01.nc"
+)
+
+```
+
+## Downloading – reticulate
+
+As an alternative to pure Python, you can use the reticulate package in R.
+
+```{r}
+library(reticulate)
+#install_python() 
+virtualenv_create(envname = "thiscopernicus")
+#virtualenv_install("thiscopernicus", packages = c("copernicusmarine"))
+use_virtualenv("thiscopernicus", required = TRUE)
+#py_install("copernicusmarine")
+
+cm <- import("copernicusmarine")
+
+cm$subset(
+    dataset_id = "cmems_mod_glo_phy_my_0.083deg_P1M-m",
+    start_datetime=paste0(1994,"-01-01T00:00:00"),
+    end_datetime=paste0(2024,"-12-31T23:59:59"),
+    variables = list("thetao"),
+    minimum_longitude = -126,
+    maximum_longitude = -115,
+    minimum_latitude = 32,
+    maximum_latitude = 50,
+    minimum_depth = 50,
+    maximum_depth = 250,
+    output_filename = "CMEMS_tmp.nc"
+  )
+```
+
+## Downloading – CopernicusMarine
+
+This example works with the R package CopernicusMarine. You need to authenticate credentials the first time you use it, and I've avoided it because it was a little glitchy during the last Copernicus upgrade
+
+```{r}
+library(CopernicusMarine)
+my_data <- cms_download_subset(
+  product = "GLOBAL_MULTIYEAR_PHY_001_030",
+  layer = "cmems_mod_glo_phy_my_0.083deg_P1M-m",
+  variable = "thetao",
+  region = c(-126, 32, -115, 50), # lon_min, lat_min, lon_max, lat_max
+  timerange = c("1994-01-01", "2024-08-20"),
+  verticalrange = c(-50, -250), # 50m to 250m depth
+  progress = TRUE
+)
+```
+
+## Processing – netCDF
+
+For most of these, you can use `tidync` in R to process the data
+
+```{r}
+  temp <- tidync::tidync("CMEMS_tmp.nc") |>
+    hyper_tibble( force = TRUE) |>
+    drop_na() |>
+    group_by(longitude,latitude,time)
+```
+
+## Post processing – summarising into time series
+
+```{r}
+library(lubridate)
+library(tidync)
+library(tidyverse)
+library(data.table)
+library(CopernicusMarine)
+```
+
+Example time series: MLDyolk To get the appropriate time series, we need to summarise the dataset. We can easily just download the data at the depths and latitude we need but to get this time series as "between the 100 and 2,000 m isobath" as defined in Vestfals et al. 2023 and to do that we need to combine our .nc tibble with a bathymetric dataset. To approach this I am going to download beyond the longitude I need then combine datasets. You can download the bathymetry data from GLORYS and then use the grid to assign longitude. Here I am just going to use the dataset as a .csv that Nick and I are already using. No need to reinvent the wheel...
+
+First lets download the mixed layer data, I usually use reticulate so I will just use Eric's approach from above:
+
+```{r}
+
+cm <- import("copernicusmarine")
+
+cm$subset(
+    dataset_id = "cmems_mod_glo_phy_my_0.083deg_P1M-m",
+    start_datetime=paste0(1994,"-01-01T00:00:00"),
+    end_datetime=paste0(2024,"-12-31T23:59:59"),
+    variables = list("mlotst"),
+    minimum_longitude = -130, #probably more longitude than we need
+    maximum_longitude = -115,
+    minimum_latitude = 31,
+    maximum_latitude = 36,#no depth because MLD is not a variable with depths
+    output_filename = "CMEMS_mlotst.nc"
+  )
+```
+
+Summarise just as Eric did
+
+```{r}
+
+  temp <- tidync::tidync("CMEMS_mlotst.nc") |>
+    hyper_tibble( force = TRUE) |>
+    drop_na() |>
+    group_by(longitude,latitude,time)
+```
+
+Copying in what we have been using for this - this is a static variable from GLORYS and linked to lat/long using the grid cell info
+
+```{r}
+
+bath <- read.csv('databathymetry-m.csv')
+
+combined <- bath%>%left_join(temp)%>% #combining data so we have bottom depth to filter over for isobath
+  filter(bottom_depth >= 100 & bottom_depth <= 2000)%>% #isobath greater than 100m less than 2,000
+  mutate(date = as_date(time/24,origin="1950-01-01 00:00:00"))%>% #adding in date
+  mutate(year=year(date), month = month(date))%>% #getting out year and month from date
+  filter(month ==1|month==2|month==3|month==4 )%>% #getting the months for the yolk-sac lifestage
+  group_by(year)%>%
+  summarise(MLD_yolk_New=mean(mlotst)) #woo! we have it
+
+
+
+```
+
+I am just going to double check this against the old dataset that I have for hake to make sure we didnt mess anything up...you could swap out the file for whatever you have from last years assessment (I think that is what I have...)
+
+```{r}
+
+old <- read.csv('DATA_Combined_glorys_hake_UNSTANDARDIZED.csv')%>%
+  select(year, MLDyolk)%>%
+  rename(MLDyolk_Old=MLDyolk)
+
+comparison_wide <- old%>%left_join(combined)
+comparison<-  comparison_wide%>%pivot_longer(-year)
+
+ggplot(data=comparison, aes(y=value, x=year, col=name))+
+  geom_line()+
+  theme_bw() #looks great! These minor differences are from the reanalysis
+
+cor(comparison_wide%>%filter(year>1993&year<2024)%>%select(MLDyolk_Old), 
+    comparison_wide%>%filter(year>1993&year<2024)%>%select(MLD_yolk_New)) #0.99 love to see it
+
+```
