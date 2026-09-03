@@ -7,7 +7,6 @@ editor: source
 # Setup
 
 
-
 ```{r}
 library(reticulate)
 
@@ -20,13 +19,14 @@ pd   <- import("pandas")
 time <- import("time")
 arraylake <- import("arraylake")
 client <- arraylake$Client()
+
 ```
 
 ```{r}
 # assign months, latitudes, and depths to filter
 # all are integers, depths are in meters
 # filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
-
+ds_depth = xr$open_dataset("../STATIC/ocean_static.deptho.nc")
 lifestage_dict <- list(
   spawn = list( # spawn
     min_month = 1,
@@ -82,72 +82,122 @@ lifestage_dict <- list(
 
 ```{r echo=FALSE}
 
-library(ncdfCF)
-url <- "https://compute.earthmover.io/v1/services/dap2/NOAA-PMEL/cefi-nep-hindcast-monthly/main/regrid/aux1/opendap"
-ds <- open_ncdf(url)
+# 1. Load local NetCDF datasets using xarray
+# depth is used to filter longitudinal extent
+ds_depth <- xr$open_dataset("../STATIC/ocean_static.deptho.nc")
 
-# The double brackets extract these as dataset to keep the same structure as the previous code.
-# look at the variables
-names(ds)
+# 2. Connect to Earthmover Arraylake
+client <- arraylake$Client()
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly")
+session <- repo$readonly_session(branch = "main")
 
-# Lazy load
-ds_mld <- ds[['MLD_003']]
+# Load aux group Zarr data
+aux <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/aux1")
+# Use list() to match Python's double bracket [['MLD_003']] dataset subsetting
+ds_mld <- aux[list("MLD_003")]
 ds_temp = ds[['thetao']]
 ds_xv = ds[['uo_rotate']]
 ds_yv = ds[['vo_rotate']]
 ds_ssh = ds[['ssh_rotate']]
+
+```
+
+```{r echo=FALSE}
+# Ensure numpy is imported for the NaN checking block
+np <- import("numpy", convert = FALSE)
+
+print_ds_info <- function(dataset, var_name, nan_bool = FALSE) {
+  
+  # Access the variable array using standard R list indexing
+  var_array <- dataset[[var_name]]
+  
+  # In Python, .size and .shape are attributes
+  denominator <- py_to_r(var_array$size)
+  shape <- py_to_r(var_array$shape)
+  
+  # Format shape into a clean string (e.g., "(12, 360, 720)")
+  shape_str <- paste0("(", paste(shape, collapse = ", "), ")")
+  
+  cat(sprintf("%d records with dimensions %s\n", denominator, shape_str))
+  
+  if (nan_bool) {
+    # Call NumPy's isfinite on the python data object
+    # .sum() converts the boolean array to a count
+    numerator <- py_to_r(np$isfinite(var_array$data)$sum())
+    percent <- (numerator / denominator) * 100
+    
+    cat(sprintf("%d records (%.2f%%) are not np.nan\n", numerator, percent))
+  }
+  
+  return(invisible(NULL))
+}
+```
+
+```{r echo=FALSE}
+py <- import_builtins()
+var_dataset<-ds_mld
+depth_dataset<-ds_depth
+ds_var_name<-"MLD_003"
+df_var_name<-"MLDegg"
+df_var_name<-lifestage_dict[['egg']]
+stage<-'egg'
+
+annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name, filter_dict,stage, print_counts = TRUE) {
+  
+  # Start timer
+  start_time <- Sys.time()
+  cat(paste0("---", df_var_name, "---\n"))
+  
+  # Print initial info
+  print_ds_info(var_dataset, ds_var_name, print_counts)
+  
+  # Merge files
+  ds_merged <- xr$merge(list(var_dataset, depth_dataset))
+  print_ds_info(ds_merged, ds_var_name, print_counts)
+  
+  # Create list with months (R vectors auto-convert to Python lists)
+  month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
+  
+  # Select times and latitudes
+  # Using xr$slice for slicing dimensions via reticulate
+  ds_selected <- ds_merged$sel(
+    time = ds_merged$time$dt$month$isin(month_list), 
+    lat = py$slice(filter_dict[[stage]][["min_lat"]], filter_dict[[stage]][["max_lat"]])
+  )
+  print_ds_info(ds_selected, ds_var_name, print_counts)
+  
+  # Mask depths using bitwise AND (&) on the xarray DataArrays
+  ds_masked <- ds_selected$where(
+    (ds_selected$deptho >= filter_dict[[stage]][['min_depth']]) & (ds_selected$deptho <= filter_dict[[stage]][['max_depth']])
+  )
+  print_ds_info(ds_masked, ds_var_name, print_counts)
+  
+  # Calculate mean grouped by year
+  # Dim parameter accepts an R vector which automatically passes as a Python list
+  ds_mean <- ds_masked[[ds_var_name]]$groupby('time.year')$mean(dim = c('time', 'lon', 'lat'))
+  
+  # Create pandas dataframe and automatically convert it to an R data.frame
+  # Setting convert = TRUE ensures it returns a native R data frame
+  ds_df <- py_to_r(ds_mean$to_dataframe())
+  
+  # Rename column from dataset to dataframe variable name in R syntax
+  names(ds_df)[names(ds_df) == ds_var_name] <- df_var_name
+  
+  # End timer and print runtime
+  end_time <- Sys.time()
+  runtime_minutes <- as.numeric(difftime(end_time, start_time, units = "mins"))
+  cat(sprintf("Runtime: %.2f minutes\n", runtime_minutes))
+  
+  # Write output to CSV using standard R engine
+  write.csv(ds_df, paste0("Output/hake_MOM6_", df_var_name, ".csv"), row.names = TRUE)
+  
+  return(ds_df)
+}
+
 ```
 
 
-
 ```{r echo=FALSE}
-# Lazily load the entire dataset
-library(ncdfCF)
-url <- "https://compute.earthmover.io/v1/services/dap2/NOAA-PMEL/cefi-nep-hindcast-monthly/main/regrid/main/opendap"
-ds <- open_ncdf(url)
+MLDegg = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDegg", lifestage_dict, 'egg',TRUE)
 
-# look at the variables
-names(ds)
-
-# Lazy load
-vo <- ds[["vo_rotate"]]
-
-# Let's check dimnames
-dimnames(vo)
-
-# Let's get surface for one time-step
-# Takes about 1.6 seconds for me, so 10 min for the whole thing and 0.9 Gb
-system.time({
-  vo_surface_t1 <- vo[, , 1, 1]
-})
-
-## Try a smaller area
-lon_axis <- ds[["lon"]]
-lat_axis <- ds[["lat"]]
-
-lon <- lon_axis$coordinates
-lat <- lat_axis$coordinates
-
-## Bounding box
-lon_min <- 220
-lon_max <- max(lon)
-lat_min <- 20
-lat_max <- 48
-
-##
-# https://r-cf.github.io/ncdfCF/articles/ncdfCF.html
-(vo_sub <- vo$subset(z_l = 2.5, 
-                     lon = c(lon_min, lon_max), 
-                     lat = c(lat_min, lat_max),
-                     time = 2025))
-
-
-## this works
-lon <- ds[["lon"]]$coordinates
-lat <- ds[["lat"]]$coordinates
-
-lon_idx <- which(lon >= lon_min & lon <= lon_max)
-lat_idx <- which(lat >= lat_min & lat <= lat_max)
-
-vo_surface_bbox <- vo[lon_idx, lat_idx, 1, ]
 ```
