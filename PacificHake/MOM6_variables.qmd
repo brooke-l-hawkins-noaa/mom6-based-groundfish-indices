@@ -6,27 +6,53 @@ editor: source
 
 # Setup
 
+First we need to set up our python environment for reticulate and make sure it is calling the correct version of icechunk and arraylake to be able to interact with Eartmover. Reticulate automatically loads an environment when you start a new session and ensuring the python environment you are using with reticulate is correctly specifying the correct version of python and the Earthmover associated packages is key.
 
 ```{r}
 library(reticulate)
 
-# Import Python modules into R variables
-#py_install(c("arraylake))
-py_install(c("arraylake")) 
-xr   <- import("xarray")
-np   <- import("numpy")
+# Force reticulate to pull down the newest package versions
+py_require("icechunk>=2.0.0")
+py_require("arraylake>=1.0.0")
+py_require("zarr")
+py_require("h5netcdf")
+py_require("h5py")
+py_require("xarray")
+
+# Import the fresh libraries
+arraylake <- import("arraylake") #the data visual layer of Earthmover
+zarr <- import("zarr") #interact with compressed data chunks and JSON metadata
+xr   <- import("xarray") #python library for working with arrays
+np   <- np <- import("numpy", convert = FALSE) #necessary for the NaN checking block
 pd   <- import("pandas")
 time <- import("time")
-arraylake <- import("arraylake")
+
+# Verify the version 
+print(arraylake$`__version__`) 
+```
+
+Now we will load the data from Earthmover and a static .netcdf. Whether or not this loads correctly will identify whether the python environment is loaded correctly in R and may require trounblshooting 
+```{r}
+# Connect to your NOAA data repository
 client <- arraylake$Client()
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly") 
+print(repo)
+
+#If this runs then Earthmover is functioning!
+
+ds_depth = xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+
+#If this runs then xarray has appropriate dependencies loaded
 
 ```
+
+
 
 ```{r}
 # assign months, latitudes, and depths to filter
 # all are integers, depths are in meters
 # filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
-ds_depth = xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+
 lifestage_dict <- list(
   spawn = list( # spawn
     min_month = 1,
@@ -91,21 +117,20 @@ client <- arraylake$Client()
 repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly")
 session <- repo$readonly_session(branch = "main")
 
-# Load aux group Zarr data
+# Load aux group Zarr data - this is data that is not a direct main output (it is calculated from model output)
 aux <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/aux1")
+# Load the main group Zarr data 
+main <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/main")
 # Use list() to match Python's double bracket [['MLD_003']] dataset subsetting
 ds_mld <- aux[list("MLD_003")]
-ds_temp = ds[['thetao']]
-ds_xv = ds[['uo_rotate']]
-ds_yv = ds[['vo_rotate']]
-ds_ssh = ds[['ssh_rotate']]
+ds_temp = main[list('thetao')]
+ds_xv = main[list('uo_rotate')]
+ds_yv = main[list('vo_rotate')]
+ds_ssh = aux[list('ssh')]
 
 ```
 
 ```{r echo=FALSE}
-# Ensure numpy is imported for the NaN checking block
-np <- import("numpy", convert = FALSE)
-
 print_ds_info <- function(dataset, var_name, nan_bool = FALSE) {
   
   # Access the variable array using standard R list indexing
@@ -133,15 +158,10 @@ print_ds_info <- function(dataset, var_name, nan_bool = FALSE) {
 }
 ```
 
+
+Developing a function for 2-dimensional data. This is relevant for MLD, SSH, and SST.
 ```{r echo=FALSE}
 py <- import_builtins()
-var_dataset<-ds_mld
-depth_dataset<-ds_depth
-ds_var_name<-"MLD_003"
-df_var_name<-"MLDegg"
-df_var_name<-lifestage_dict[['egg']]
-stage<-'egg'
-
 annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name, filter_dict,stage, print_counts = TRUE) {
   
   # Start timer
@@ -197,7 +217,21 @@ annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name,
 ```
 
 
+Assigning variable information to post process MLD
 ```{r echo=FALSE}
+var_dataset<-ds_mld
+depth_dataset<-ds_depth
+ds_var_name<-"MLD_003"
+df_var_name<-"MLDegg"
+df_var_name<-lifestage_dict[['egg']]
+stage<-'egg'
+```
+
+```{r echo=FALSE}
+#Run MLD code
 MLDegg = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDegg", lifestage_dict, 'egg',TRUE)
 
+MLDlatelarv = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv',TRUE)
+
+MLDyolk = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',TRUE)
 ```
