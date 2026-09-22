@@ -12,13 +12,15 @@ First we need to set up our python environment for reticulate and make sure it i
 library(reticulate)
 
 # Force reticulate to pull down the newest package versions
+#reticulate::py_install("dask")
 py_require("icechunk>=2.0.0")
 py_require("arraylake>=1.0.0")
 py_require("zarr")
 py_require("h5netcdf")
 py_require("h5py")
 py_require("xarray")
-
+py_require("scipy")
+py_require("dask")
 # Import the fresh libraries
 arraylake <- import("arraylake") #the data visual layer of Earthmover
 zarr <- import("zarr") #interact with compressed data chunks and JSON metadata
@@ -26,6 +28,7 @@ xr   <- import("xarray") #python library for working with arrays
 np   <- np <- import("numpy", convert = FALSE) #necessary for the NaN checking block
 pd   <- import("pandas")
 time <- import("time")
+dask <- import("dask")
 
 # Verify the version 
 print(arraylake$`__version__`) 
@@ -35,6 +38,7 @@ Now we will load the data from Earthmover and a static .netcdf. Whether or not t
 ```{r}
 # Connect to your NOAA data repository
 client <- arraylake$Client()
+#token issue? go to terminal arraylake auth login
 repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly") 
 print(repo)
 
@@ -68,7 +72,12 @@ lifestage_dict <- list(
     min_lat   = 40,
     max_lat   = 60,
     min_depth = 40,
-    max_depth = 60
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+
   ), #long extent shelf break
   yolk = list( # yolk
     min_month = 1,
@@ -76,7 +85,9 @@ lifestage_dict <- list(
     min_lat   = 31,
     max_lat   = 36,
     min_depth = 50, 
-    max_depth = 100 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
   ), #long extent shelf break
   JAc = list( # JAc
     min_month = 1,
@@ -84,7 +95,59 @@ lifestage_dict <- list(
     min_lat   = 34.5,
     max_lat   = 42.5,
     min_depth = 30,
-    max_depth = 130
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    JAs = list( # JAs
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    MSc = list( # MSc
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 34.5,
+    max_lat   = 42.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    MSs = list( # MSs
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    MSn = list( # MSn
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 42.5,
+    max_lat   = 47,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    larv = list( # larv
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
   ),
   latelarv = list( # latelarv
     min_month = 3,
@@ -92,7 +155,9 @@ lifestage_dict <- list(
     min_lat   = 31,
     max_lat   = 37,
     min_depth = 50,
-    max_depth = 300
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
   ),
   late = list( # late
     min_month = 3,
@@ -106,11 +171,43 @@ lifestage_dict <- list(
 
 ```
 
+Figuring out why the distance variable wouldn't map onto the MOM6 data was a nightmare
+
 ```{r echo=FALSE}
 
 # 1. Load local NetCDF datasets using xarray
-# depth is used to filter longitudinal extent
+# depth is used to filter longitudinal extent based on isobath
 ds_depth <- xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+# depth is used to filter longitudinal extent based on distance from shore
+# 1. Open the raw file
+ds_dist_raw <- xr$open_dataset("../STATIC/mom6-nep_regrid_dist2coast_CCS.nc")
+
+# 2. Safely isolate the true geographic decimal vectors from the 2D matrix arrays
+# Since they are stored as variables, we can extract the true linear coordinates
+true_lat_vector <- py_to_r(ds_dist_raw[["lat"]]$values[, 1])
+true_lon_vector_raw <- py_to_r(ds_dist_raw[["lon"]]$values[1, ])
+
+# 3. Convert Longitude map from (-180 to 180) into (0 to 360) global scale
+# This ensures that -125 degrees west maps to 235 degrees global
+true_lon_vector <- (true_lon_vector_raw %% 360)
+
+# 4. Wipe out the old placeholder data variables to prevent name collisions
+ds_dist_clean <- ds_dist_raw$drop_vars(list("lat", "lon"))
+
+# 5. Overwrite the generic index coordinates with your true geographical decimals
+ds_dist_assigned <- ds_dist_clean$assign_coords(list(
+  latitude = true_lat_vector,
+  longitude = true_lon_vector
+))
+
+# 6. Standardize the dimension labels to match your main data exactly
+ds_dist <- ds_dist_assigned$rename(list(latitude = "lat", longitude = "lon"))
+
+# Verify the changes (You will see active asterisks * next to true decimal coordinates!)
+print(ds_dist)
+```
+
+```{r echo=FALSE}
 
 # 2. Connect to Earthmover Arraylake
 client <- arraylake$Client()
@@ -162,7 +259,7 @@ print_ds_info <- function(dataset, var_name, nan_bool = FALSE) {
 Developing a function for 2-dimensional data. This is relevant for MLD, SSH, and SST.
 ```{r echo=FALSE}
 py <- import_builtins()
-annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name, filter_dict,stage, print_counts = TRUE) {
+annual_mean_2d <- function(var_dataset, long_dataset, ds_var_name, df_var_name, filter_dict,stage, precond, print_counts = TRUE) {
   
   # Start timer
   start_time <- Sys.time()
@@ -171,8 +268,8 @@ annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name,
   # Print initial info
   print_ds_info(var_dataset, ds_var_name, print_counts)
   
-  # Merge files
-  ds_merged <- xr$merge(list(var_dataset, depth_dataset))
+  # Merge variable with mask file
+  ds_merged <- xr$merge(list(var_dataset, long_dataset))
   print_ds_info(ds_merged, ds_var_name, print_counts)
   
   # Create list with months (R vectors auto-convert to Python lists)
@@ -186,9 +283,9 @@ annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name,
   )
   print_ds_info(ds_selected, ds_var_name, print_counts)
   
-  # Mask depths using bitwise AND (&) on the xarray DataArrays
+  # Mask longs using bitwise AND (&) on the xarray DataArrays
   ds_masked <- ds_selected$where(
-    (ds_selected$deptho >= filter_dict[[stage]][['min_depth']]) & (ds_selected$deptho <= filter_dict[[stage]][['max_depth']])
+    (ds_selected$deptho >= filter_dict[[stage]][['min_iso']]) & (ds_selected$deptho <= filter_dict[[stage]][['max_iso']])
   )
   print_ds_info(ds_masked, ds_var_name, print_counts)
   
@@ -200,6 +297,17 @@ annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name,
   # Setting convert = TRUE ensures it returns a native R data frame
   ds_df <- py_to_r(ds_mean$to_dataframe())
   
+    # --- ADDED PRECOND LAG LOGIC ---
+  # If precond is TRUE, add a 1-year lag to the timeline data index
+  if (precond) {
+    cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
+    # In a default pandas to_dataframe() conversion with groupby('time.year'),
+    # the years are stored as the index (rownames) of the R data frame.
+    current_years <- as.numeric(rownames(ds_df))
+    lagged_years <- current_years + 1
+    rownames(ds_df) <- as.character(lagged_years)
+  }
+  
   # Rename column from dataset to dataframe variable name in R syntax
   names(ds_df)[names(ds_df) == ds_var_name] <- df_var_name
   
@@ -209,29 +317,144 @@ annual_mean_2d <- function(var_dataset, depth_dataset, ds_var_name, df_var_name,
   cat(sprintf("Runtime: %.2f minutes\n", runtime_minutes))
   
   # Write output to CSV using standard R engine
-  write.csv(ds_df, paste0("Output/hake_MOM6_", df_var_name, ".csv"), row.names = TRUE)
+  #write.csv(ds_df, paste0("Output/hake_MOM6_", df_var_name, ".csv"), row.names = TRUE)
   
   return(ds_df)
 }
 
 ```
 
-
-Assigning variable information to post process MLD
+Is this function the speediest? No. But it is set up to be extremely efficient in how the data is loaded to minimize ram. With how it is set up it should use less than 1GB of ram and each individual variable should take less than 10 seconds to run. If you are running 50 variables it will take < 10 minutes to run and you won't crash R (my alternative formulation ran in 1 minute but if you had less than 120 gb of ram...good luck!). Ideally, this will make the code reproducible to daily data
 ```{r echo=FALSE}
-var_dataset<-ds_mld
-depth_dataset<-ds_depth
-ds_var_name<-"MLD_003"
-df_var_name<-"MLDegg"
-df_var_name<-lifestage_dict[['egg']]
-stage<-'egg'
+annual_mean_2d_v2 <- function(var_dataset, long_dataset, distance, ds_var_name, df_var_name, filter_dict, stage, precond, print_counts = TRUE) {
+  start_time <- Sys.time()
+  cat(paste0("---", df_var_name, "---\n"))
+  
+  # Fetch native Python built-ins for slicing syntax
+  py <- import_builtins()
+  
+  # 1. Temporal filter on the main array (1D operation)
+  month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
+  var_selected <- var_dataset$sel(time = var_dataset$time$dt$month$isin(month_list))
+  
+  # Extract year timelines safely
+  py_years <- var_selected$time$dt$year$values
+  r_years <- py_to_r(py_years)
+  
+  # Extract geographical coordinates cleanly as floating decimals
+  min_lat <- as.numeric(filter_dict[[stage]][["min_lat"]])
+  max_lat <- as.numeric(filter_dict[[stage]][["max_lat"]])
+  
+  # 2. Slice spatial coordinate boundaries on the main 1D variable array FIRST
+  # This isolates only your 20-latitude window right out of the box
+  var_selected <- var_selected$sel(lat = py$slice(min_lat, max_lat))
+  var_array <- var_selected[[ds_var_name]]
+  
+  # 3. Dynamic Coordinate Name Standardization for long_dataset
+  cat("Standardizing mask coordinate names...\n")
+  dim_keys <- py_to_r(py$list(long_dataset$dims))
+  
+  rename_list <- list()
+  if ("latitude" %in% dim_keys)  rename_list$latitude <- "lat"
+  if ("longitude" %in% dim_keys) rename_list$longitude <- "lon"
+  
+  if (length(rename_list) > 0) {
+    long_dataset <- long_dataset$rename(rename_list)
+  }
+  
+  # 4. Use Xarray's interp_like to ensure alignment
+  cat("Interpolating mask grid onto variable layout...\n")
+  if (distance) {
+    mask_sliced <- long_dataset[["dist"]]$interp_like(var_array, method = "nearest")
+    py_mask <- (mask_sliced$lat >= min_lat) & 
+               (mask_sliced$lat <= max_lat) & 
+               (mask_sliced >= filter_dict[[stage]][['min_dist']]) & 
+               (mask_sliced <= filter_dict[[stage]][['max_dist']]) & 
+               (!mask_sliced$isnull())
+  } else {
+    mask_sliced <- long_dataset[["deptho"]]$interp_like(var_array, method = "nearest")
+    py_mask <- (mask_sliced$lat >= min_lat) & 
+               (mask_sliced$lat <= max_lat) & 
+               (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
+               (mask_sliced <= filter_dict[[stage]][['max_iso']]) & 
+               (!mask_sliced$isnull())
+  }
+  
+  # 5. Apply the mask layer
+  cat("Applying mask layer...\n")
+  var_masked <- var_array$where(py_mask)
+  
+  # Identify remaining spatial dimensions to collapse
+  all_dims <- var_masked$dims
+  spatial_dims_to_drop <- all_dims[all_dims != "time"]
+  
+  # 6. Collapse spatial dimensions natively inside Python
+  cat("Collapsing spatial dimensions natively...\n")
+  spatial_mean_series <- var_masked$mean(dim = spatial_dims_to_drop, skipna = TRUE)
+  
+  # 7. Pull the aggregated numeric timelines into R environment
+  cat("Extracting values safe from memory overhead...\n")
+  raw_values <- py_to_r(spatial_mean_series$values)
+  
+  
+  
+  # Manually construct a lightweight R data frame
+  temp_df <- data.frame(
+    year = r_years,
+    value = raw_values
+  )
+  
+  # 8. Aggregate annual timeline averages using R's engine
+  cat("Aggregating annual timeline numbers in R...\n")
+  ds_df <- aggregate(value ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
+  
+      # --- ADDED PRECONDITIONING LAG LOGIC ---
+  # If preconditioning is TRUE, add a 1-year lag to the timeline data index
+  if (precond) {
+    cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
+    # In a default pandas to_dataframe() conversion with groupby('time.year'),
+    # the years are stored as the index (rownames) of the R data frame.
+    current_years <- as.numeric(rownames(ds_df))
+    lagged_years <- current_years + 1
+    rownames(ds_df) <- as.character(lagged_years)
+  }
+  # Format column and index headers
+  rownames(ds_df) <- ds_df$year
+  ds_df$year <- NULL
+  names(ds_df) <- df_var_name
+  
+  # Explicitly trigger system garbage collection
+  rm(temp_df, raw_values, r_years)
+  gc()
+  
+  # Print script runtime metrics
+  end_time <- Sys.time()
+  runtime_minutes <- as.numeric(difftime(end_time, start_time, units = "mins"))
+  cat(paste0("Runtime: ", round(runtime_minutes, 2), " minutes\n"))
+  
+  return(ds_df)
+}
+
 ```
 
+Running functions for the 2d variables
 ```{r echo=FALSE}
 #Run MLD code
-MLDegg = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDegg", lifestage_dict, 'egg',TRUE)
+MLDegg = annual_mean_2d_v2(ds_mld, ds_depth,FALSE, "MLD_003", "MLDegg", lifestage_dict, 'egg',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
 
-MLDlatelarv = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv',TRUE)
+MLDlatelarv = annual_mean_2d_v2(ds_mld, ds_depth,FALSE, "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv', precond=FALSE, TRUE)
 
-MLDyolk = annual_mean_2d(ds_mld, ds_depth, "MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',TRUE)
+MLDyolk = annual_mean_2d_v2(ds_mld, ds_depth, FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
+
+MLDlarv = annual_mean_2d_v2(ds_mld, ds_depth, FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE,TRUE)
+
+#Run SSH code
+SSHjac = annual_mean_2d_v2(ds_ssh, ds_dist, TRUE,"ssh", "SSHjac", lifestage_dict, 'JAc',precond=FALSE,TRUE)
+
+SSHjas = annual_mean_2d_v2(ds_ssh, ds_dist, TRUE,"ssh", "SSHjas", lifestage_dict, 'JAs',precond=FALSE,TRUE)
+
+SSHmsc = annual_mean_2d_v2(ds_ssh, ds_dist, TRUE,"ssh", "SSHmsc", lifestage_dict, 'MSc',precond=FALSE,TRUE)
+
+SSHmss = annual_mean_2d_v2(ds_ssh, ds_dist, TRUE,"ssh", "SSHmss", lifestage_dict, 'MSs',precond=FALSE,TRUE)
+
 ```
