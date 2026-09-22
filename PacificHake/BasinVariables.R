@@ -114,7 +114,7 @@ wide_lifestage_summary <- lifestage_summaries %>%
     names_from = lifestage,
     values_from = c(-year, -lifestage),
     # This reshapes names from "mean_NPGO" + "JA" into "mean_NPGO_JA"
-    names_glue = "{.value}_{lifestage}"
+    names_glue = "{.value}{lifestage}"
   )
 
 # View your tidy, single-row-per-year database structure
@@ -125,7 +125,7 @@ lag<-1
 preconditioning <-wide_lifestage_summary%>%
   mutate(year=year+lag)%>%
   select(c(year,contains("AS")))%>%
-  rename_with(~ str_replace(.x, "_AS$", "_pre"), ends_with("_AS"))
+  rename_with(~ str_replace(.x, "_AS$", "pre"), ends_with("_AS"))
 
 # 6. Full dataset
 full_dataset <- left_join(preconditioning,wide_lifestage_summary)
