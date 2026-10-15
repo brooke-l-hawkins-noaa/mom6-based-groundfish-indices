@@ -192,6 +192,14 @@ lifestage_dict <- list(
     max_lat   = 34.5,
     min_depth = 75,
     max_depth = 275
+  ),
+    JA = list( # Jan to april
+    min_month = 1,
+    max_month = 4
+  ),
+  AS = list( # April to september
+    min_month = 4,
+    max_month = 9
   )
 )
 
@@ -282,16 +290,6 @@ TEMPspawn = annual_mean_3d(ds_temp, ds_depth, FALSE,"thetao", "TEMPspawn", lifes
 
 ```{r echo=FALSE}
 
-lifestage_dict_basin <- list(
-  JA = list( # spawn
-    min_month = 1,
-    max_month = 4
-  ), #long extent shelf break
-  AS = list( # egg
-    min_month = 4,
-    max_month = 9
-  )
-)
 
 climate_datasets <- data.frame(
   variable=c("NPGO", "PDO"),
@@ -322,11 +320,11 @@ compiled_dataset$year   <- lubridate::year(compiled_dataset$time)
 
 cleaned_dataset<-compiled_dataset
 
-# 3. Summarize metrics across each element of lifestage_dict_basin dynamically
-lifestage_summaries <- lapply(names(lifestage_dict_basin), function(stage_name) {
+# 3. Summarize metrics across each element of lifestage_dict dynamically
+lifestage_summaries <- lapply(names(lifestage_dict), function(stage_name) {
   
-  mn <- lifestage_dict_basin[[stage_name]]$min_month
-  mx <- lifestage_dict_basin[[stage_name]]$max_month
+  mn <- lifestage_dict[[stage_name]]$min_month
+  mx <- lifestage_dict[[stage_name]]$max_month
   
 
     stage_data <- cleaned_dataset %>% filter(month >= mn & month <= mx)
@@ -365,10 +363,10 @@ lag<-1
 preconditioning <-wide_lifestage_summary%>%
   mutate(year=year+lag)%>%
   select(c(year,contains("AS")))%>%
-  rename_with(~ str_replace(.x, "_AS$", "pre"), ends_with("_AS"))
+  rename_with(~ str_replace(.x, "AS$", "_pre"), ends_with("AS"))
 
 # 6. Full dataset
 full_dataset <- left_join(preconditioning,wide_lifestage_summary)
-#write.csv(full_dataset, "Output/ERRDAP_var.csv", row.names = FALSE)
+write.csv(full_dataset, "Output/ERRDAP_var.csv", row.names = FALSE)
 
 ```
