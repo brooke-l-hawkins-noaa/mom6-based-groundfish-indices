@@ -1,0 +1,30 @@
+Package: mom6-based-groundfish-indices
+Title: Process oceanographic data for West Coast Groundfish
+Version: 2021.02
+Authors@R: 
+    person(given = "Megan",
+           family = "Feddern",
+           role = c("aut", "cre"),
+           email = "megan.feddern@noaa.gov",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Process oceanographic data for West Coast Groundfish
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+Imports: 
+    reticulate,
+    rerddap,
+    httr,
+    dplyr,
+    tidyr,
+    corrplot,
+    ggplot2,
+    lubridate,
+    purrr,
+    stringr
+Depends:
+    R (>= 2.10)
+VignetteBuilder: knitr
