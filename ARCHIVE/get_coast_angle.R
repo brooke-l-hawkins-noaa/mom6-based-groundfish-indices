@@ -1,7 +1,7 @@
 #' Calculate coast angle
 #' @author Megan L. Feddern
 
-get_coast_angle <- function(index, points_df, window_size = 15) {
+get_coast_angle <- function(index, points_df, window_size) {
   half_w <- floor(window_size / 2)
   start_idx <- max(1, index - half_w)
   end_idx <- min(nrow(points_df), index + half_w)
