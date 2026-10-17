@@ -8,6 +8,7 @@ devtools::load_all(here::here())
 
 # 1. Load the Bathymetry NetCDF file
 nc_path <- "STATIC/ocean_static.deptho.nc"
+nc_path <- "../STATIC/mom6_regrid_coastangle_CCS.nc"
 
 # Read the depth sub-dataset as a raster file
 depth_raster <- rast(nc_path, subds = "deptho")

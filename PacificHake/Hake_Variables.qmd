@@ -393,8 +393,8 @@ coast_points_filtered <- data.frame(
 # result <- transport_3d(..., coast_points_df = coast_points_filtered, ...)
 
 
-
 ASTeggs = transport_3d(ds_xv,ds_yv, ds_depth, coast_points_filtered, lifestage_dict, 'egg',precond=FALSE, TRUE)
 
 ASTlarv = transport_3d(ds_xv,ds_yv, ds_depth, coast_points_filtered, lifestage_dict, 'larv',precond=FALSE, TRUE)
+
 ```
