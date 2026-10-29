@@ -267,26 +267,26 @@ ds_ssh = aux[list('ssh')]
 #py <- import_builtins()
 #library(reticulate)
 #Run MLD code
-MLDegg = annual_mean_2d(ds_mld, ds_depth,FALSE, "MLD_003", "MLDegg", lifestage_dict, 'egg',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
+MLDegg = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDegg", lifestage_dict, 'egg',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
 
-MLDlatelarv = annual_mean_2d(ds_mld, ds_depth,FALSE, "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv', precond=FALSE, TRUE)
+MLDlatelarv = annual_mean_2d(ds_mld, ds_depth,"isobath",FALSE, "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv', precond=FALSE, TRUE)
 
-MLDyolk = annual_mean_2d(ds_mld, ds_depth, FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
+MLDyolk = annual_mean_2d(ds_mld, ds_depth,"isobath", FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
 
-MLDlarv = annual_mean_2d(ds_mld, ds_depth, FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE,TRUE)
+MLDlarv = annual_mean_2d(ds_mld, ds_depth, "isobath", FALSE,"MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE,TRUE)
 
 #Run SSH code
-SSHjac = annual_mean_2d(ds_ssh, ds_dist, TRUE,"ssh", "SSHjac", lifestage_dict, 'JAc',precond=FALSE,TRUE)
+SSHjac = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHjac", lifestage_dict, 'JAc',precond=FALSE,TRUE)
 
-SSHjas = annual_mean_2d(ds_ssh, ds_dist, TRUE,"ssh", "SSHjas", lifestage_dict, 'JAs',precond=FALSE,TRUE)
+SSHjas = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHjas", lifestage_dict, 'JAs',precond=FALSE,TRUE)
 
-SSHmsc = annual_mean_2d(ds_ssh, ds_dist, TRUE,"ssh", "SSHmsc", lifestage_dict, 'MSc',precond=FALSE,TRUE)
+SSHmsc = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmsc", lifestage_dict, 'MSc',precond=FALSE,TRUE)
 
-SSHmss = annual_mean_2d(ds_ssh, ds_dist, TRUE,"ssh", "SSHmss", lifestage_dict, 'MSs',precond=FALSE,TRUE)
+SSHmss = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmss", lifestage_dict, 'MSs',precond=FALSE,TRUE)
 
-TEMPpre = annual_mean_3d(ds_temp, ds_depth, FALSE,"thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
+TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
 
-TEMPspawn = annual_mean_3d(ds_temp, ds_depth, FALSE,"thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
+TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
 
 
 ```

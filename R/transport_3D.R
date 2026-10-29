@@ -1,6 +1,6 @@
 
 
-transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_points_df, filter_dict, stage, precond, print_counts = TRUE) {
+transport_2d <- function(u_dataset, v_dataset, long_dataset, coast_points_df, filter_dict, stage, precond, print_counts = TRUE) {
   start_time <- Sys.time()
   cat("--- Calculating 3D Coastal Transport (Alongshore & Cross-shore) ---\n")
   
@@ -53,6 +53,13 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_points_df, fi
   # =========================================================================
   # 3. COORDINATE STANDARDIZATION & DATAFRAME ANGLE BROADCASTING
   # =========================================================================
+  # In many global ocean models, U and V vectors are calculated on slightly staggered 
+  # spatial grids (for MOM6 its the Arakawa C-grids). This section uses linear interpolation
+  # to shift the V coordinate matrix points and the bathymetry masks so that they map 
+  # exactly onto the coordinate points of the U grid matrix. If you are curious see
+  # Kelly Kearneys excellent MOM6 grid explainer for more details 
+  # https://beringnpz.github.io/ak_regional_mom6/cefi_dataset.html
+  
   cat("Standardizing coordinate names and mapping dataframe angles...\n")
   dim_keys <- py_to_r(py$list(long_dataset$dims))
   rename_list <- list()
@@ -64,41 +71,72 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_points_df, fi
     long_dataset <- long_dataset$rename(rename_list)
   }
   
-  # Interpolate velocity matrices and masks onto matching grid structures
+  # Interpolate velocity matrices and masks onto matching grid structures using
+  # the U grid matrix
+  
   v_array_aligned <- v_selected$interp_like(u_selected, method = "linear")
   mask_sliced     <- long_dataset[["deptho"]]$interp_like(u_selected, method = "nearest")
   
   # Extract the mean angle value from your calculated flat R dataframe
   # and broadcast it uniformly across the active 3D array matrix dimensions
+  # because everything is now aligned with the U grid, you can just use U here
+  # Computes the mathematical average of the orientation angle values (in radians) 
+  # stored inside coast_points_df table, ignoring missing data entries.
   mean_angle_rad <- mean(coast_points_df$coast_angle_rad, na.rm = TRUE)
   cangle_sliced <- u_selected * 0 + mean_angle_rad
   
   # =========================================================================
-  # 4. CROSS-SHORE MASK GENERATION
+  # 4. MASK GENERATION
   # =========================================================================
+  # we have a single mask generationg here, because again, we are working with everything
+  # translated onto the U grid. Generates an object containing logical TRUE/FALSE 
+  # states for every point on the grid. A coordinate point yields TRUE only if 
+  # it matches your latitude box limits, falls within the depth constraints 
+  # (min_iso to max_iso), and does not represent an empty/land data void.
+  
   py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
     (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
     (mask_sliced <= filter_dict[[stage]][['max_iso']]) & (!mask_sliced$isnull())
   
   # =========================================================================
-  # 5. MATHEMATICAL ORIENTATION RESOLUTION (RADIAN EQUATIONS)
+  # 5. MATHEMATICAL ORIENTATION RESOLUTION & THICKNESS EXTRACTION
   # =========================================================================
   cat("Resolving vectors along high-res coastal orientation models...\n")
-  ua_array <- v_array_aligned * np$sin(cangle_sliced) - u_selected * np$cos(cangle_sliced)
-  uc_array <- v_array_aligned * np$cos(cangle_sliced) + u_selected * np$sin(cangle_sliced)
   
+  # 5a. Standard coordinate rotation equations
+  ua_array <- (v_array_aligned * np$sin(cangle_sliced)) - (u_selected * np$cos(cangle_sliced))
+  uc_array <- (v_array_aligned * np$cos(cangle_sliced)) + (u_selected * np$sin(cangle_sliced))
+  
+  # 5b. Extract the layer thicknesses (dzh) matching your sliced domain
+  # Note: Adjust "dzh" to your specific dataset variable name if it differs (e.g., "thkcello")
+  dz_sliced <- long_dataset[["dzh"]]$interp_like(u_selected, method = "nearest")
+  
+  # 5c. Apply the spatial and depth bathymetry mask to both velocities and thicknesses
   ua_masked <- ua_array$where(py_mask)
   uc_masked <- uc_array$where(py_mask)
+  dz_masked <- dz_sliced$where(py_mask) # Truncates layers at the true bottom depth
   
   # =========================================================================
-  # 6. NATIVE DIMENSION COLLAPSING (XARRAY ENGINE)
+  # 6. THICKNESS-WEIGHTED VERTICAL COLLAPSE & SPATIAL MEAN
   # =========================================================================
-  all_dims <- py_to_r(py$list(ua_masked$dims))
-  spatial_dims_to_drop <- all_dims[all_dims != "time"]
+  cat("Collapsing water column via high-performance thickness weighting...\n")
   
-  cat("Collapsing spatial/vertical dimensions inside Python engine...\n")
-  ua_series <- ua_masked$mean(dim = spatial_dims_to_drop, skipna = TRUE)
-  uc_series <- uc_masked$mean(dim = spatial_dims_to_drop, skipna = TRUE)
+  # 6a. Compute the integrated transport over the water column (Velocity * Layer Thickness)
+  ua_integrated <- ua_masked * dz_masked
+  uc_integrated <- uc_masked * dz_masked
+  
+  # 6b. Sum the integrated transport and divide by total unmasked water column thickness
+  # This isolates the vertical dimension name dynamically detected in Section 2
+  ua_weighted_vertical_mean <- ua_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
+  uc_weighted_vertical_mean <- uc_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
+  
+  # 6c. Average the resulting 2D surface over the remaining horizontal spatial dimensions
+  horizontal_dims <- py_to_r(py$list(ua_weighted_vertical_mean$dims))
+  spatial_dims_to_drop <- horizontal_dims[horizontal_dims != "time"]
+  
+  cat("Collapsing final horizontal dimensions inside Python engine...\n")
+  ua_series <- ua_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
+  uc_series <- uc_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
   
   # =========================================================================
   # 7. PARSING DATA INTO R DATA FRAMES

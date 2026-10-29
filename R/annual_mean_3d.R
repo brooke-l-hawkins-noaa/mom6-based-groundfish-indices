@@ -2,7 +2,7 @@
 #' using list() 
 #' @author Megan L. Feddern
 #' 
-annual_mean_3d <- function(var_dataset, long_dataset, distance, ds_var_name, df_var_name, filter_dict, stage, precond, print_counts = TRUE) {
+annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, df_var_name, filter_dict, stage, precond, print_counts = TRUE) {
   start_time <- Sys.time()
   cat(paste0("---", df_var_name, "---\n"))
   
@@ -56,9 +56,10 @@ annual_mean_3d <- function(var_dataset, long_dataset, distance, ds_var_name, df_
   }
   
   # now we have only the data we need AND appropriate naming convention for the mask dataset
-  # to be able to apply a mask for longitudinal extent. This can be done 2 ways:
+  # to be able to apply a mask for longitudinal extent. This can be done 3 ways:
   # 1) applying a mask of bottom depth using the static mom6 bathymetry file 
   # 2) applying a distance from shore maske using the static mom6 file
+  # 3) using a min/max longitude which is the default
   
   # 5. Use Xarray's interp_like to ensure alignment
   cat("Interpolating mask grid onto variable layout...\n")
@@ -66,35 +67,35 @@ annual_mean_3d <- function(var_dataset, long_dataset, distance, ds_var_name, df_
   # using nearest neighbor, and slices the masking file according to the parameters defined in 
   # the life history dictionary 
   
-  # if distance is true, we take the dataset in "long_dataset" and filter it useing the 
-  # 'min_dist' and "max_dist" definitions in the lifestage dictionary
-  # 4. Use Xarray's interp_like to ensure alignment 
+  # there are 3 options, if mask_type is "isobath" it fileter the longitudinal extent
+  # by bottom depth. If it is "distance" longitudinal extent is masked by distance from
+  # shore, if it is "longitude" it is by min/max longitude. This is the default if you
+  # do not provide anything
+  
+  # 5. Use Xarray's interp_like to ensure alignment 
   cat("Interpolating mask grid onto variable layout...\n") 
   
   if (mask_type == "distance") { 
-    # Option 1: Distance from shore mask
     mask_sliced <- long_dataset[["dist"]]$interp_like(var_array, method = "nearest") 
     py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_dist']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_dist']]) & 
       (!mask_sliced$isnull()) 
     
-  } else if (mask_type == "longitude") {
-    # Option 3: NEW option to filter strictly by min_long and max_long
-    # We use the dataset coordinates grid ('lon') directly mapped onto the variable dimensions
-    mask_sliced <- long_dataset[["lon"]]$interp_like(var_array, method = "nearest")
-    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
-      (mask_sliced >= filter_dict[[stage]][['min_long']]) & 
-      (mask_sliced <= filter_dict[[stage]][['max_long']]) & 
-      (!mask_sliced$isnull())
-    
-  } else { 
-    # Option 2: Default depth/isobath mask (fallback if mask_type is "depth" or unrecognized)
+  } else if (mask_type == "isobath") { 
     mask_sliced <- long_dataset[["deptho"]]$interp_like(var_array, method = "nearest") 
     py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_iso']]) & 
       (!mask_sliced$isnull()) 
+    
+  } else {
+    # Catch-all: Runs if mask_type is "longitude" or any other unrecognized value
+    mask_sliced <- long_dataset[["lon"]]$interp_like(var_array, method = "nearest")
+    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
+      (mask_sliced >= filter_dict[[stage]][['min_long']]) & 
+      (mask_sliced <= filter_dict[[stage]][['max_long']]) & 
+      (!mask_sliced$isnull())
   } 
   
   # 6. Apply the mask layer
