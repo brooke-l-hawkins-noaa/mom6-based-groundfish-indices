@@ -237,7 +237,7 @@ __marimo__/
 *.DS_store
 
 # Net CDF files
-*.nc
+#*.nc
 
 # User-specific files
 .Ruserdata
