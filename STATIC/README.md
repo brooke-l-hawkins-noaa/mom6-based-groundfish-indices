@@ -4,7 +4,7 @@ Static files necessary for running scripts to process the longitudinal extent of
 
 ## Datasets
 
-MOM6 distance from shore on native grid: shomom6-nep_dist2coast_CCS.nc
+MOM6 distance from shore on native grid: mom6-nep_dist2coast_CCS.nc
 
 MOM6 distance from shore on the regrid: mom6-nep_regrid_dist2coast_CCS.nc
 
