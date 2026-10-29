@@ -59,22 +59,34 @@ annual_mean_2d <- function(var_dataset, long_dataset, distance, ds_var_name, df_
   
   # if distance is true, we take the dataset in "long_dataset" and filter it useing the 
   # 'min_dist' and "max_dist" definitions in the lifestage dictionary 
-  if (distance) {
-    mask_sliced <- long_dataset[["dist"]]$interp_like(var_array, method = "nearest")
-    py_mask <- (mask_sliced$lat >= min_lat) & 
-      (mask_sliced$lat <= max_lat) & 
+  # 4. Use Xarray's interp_like to ensure alignment 
+  cat("Interpolating mask grid onto variable layout...\n") 
+  
+  if (mask_type == "distance") { 
+    # Option 1: Distance from shore mask
+    mask_sliced <- long_dataset[["dist"]]$interp_like(var_array, method = "nearest") 
+    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_dist']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_dist']]) & 
+      (!mask_sliced$isnull()) 
+    
+  } else if (mask_type == "longitude") {
+    # Option 3: NEW option to filter strictly by min_long and max_long
+    # We use the dataset coordinates grid ('lon') directly mapped onto the variable dimensions
+    mask_sliced <- long_dataset[["lon"]]$interp_like(var_array, method = "nearest")
+    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
+      (mask_sliced >= filter_dict[[stage]][['min_long']]) & 
+      (mask_sliced <= filter_dict[[stage]][['max_long']]) & 
       (!mask_sliced$isnull())
-  } else { #if distance is 'FALSE' then we filter using min_iso and max_iso
-    mask_sliced <- long_dataset[["deptho"]]$interp_like(var_array, method = "nearest")
-    py_mask <- (mask_sliced$lat >= min_lat) & 
-      (mask_sliced$lat <= max_lat) & 
+    
+  } else { 
+    # Option 2: Default depth/isobath mask (fallback if mask_type is "depth" or unrecognized)
+    mask_sliced <- long_dataset[["deptho"]]$interp_like(var_array, method = "nearest") 
+    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_iso']]) & 
-      (!mask_sliced$isnull())
-  }
-  
+      (!mask_sliced$isnull()) 
+  } 
   
   # 5. Apply the mask layer
   cat("Applying mask layer...\n")
