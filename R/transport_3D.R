@@ -2,14 +2,14 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   start_time <- Sys.time()
   cat("--- Calculating 3D Coastal Transport (Alongshore & Cross-shore) ---\n")
   
-  # Fetch native Python built-ins for slicing syntax
+  # Fetch native Python built-ins for slicing syntax 
   py <- import_builtins()
   np <- import("numpy") 
   
   # =========================================================================
   # 1. TEMPORAL FILTERING
   # =========================================================================
-  #here we are just going to slice the months that we need first
+  # here we are just going to slice the months that we need first
   month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
   
   u_selected <- u_dataset[["uo_rotate"]]$sel(time = u_dataset$time$dt$month$isin(month_list))
@@ -30,10 +30,12 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   u_selected <- u_selected$sel(lat = py$slice(min_lat, max_lat))
   v_selected <- v_selected$sel(lat = py$slice(min_lat, max_lat))
   
-  # Detect the depth/vertical coordinate dimension name
+  # Detect the depth/vertical coordinate dimension name and then slice
   # this is probably overkill but its built in flexibility for datasets that may have
-  # different lames for depth variables. here it is "z_l" for MOM6 which is the 
+  # different names for depth variables. here it is "z_l" for MOM6 which is the 
   # center point of the depth grid
+  # GUT CHECK...maybe we want to do this differently? does z_i make more sense so that
+  # you are getting the bottom / top of the dpeth cell
   
   depth_name <- NULL
   available_dims <- py_to_r(py$list(u_selected$dims))
@@ -126,11 +128,25 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   ua_array <- (v_array_aligned * np$sin(cangle_sliced)) - (u_selected * np$cos(cangle_sliced))
   uc_array <- (v_array_aligned * np$cos(cangle_sliced)) + (u_selected * np$sin(cangle_sliced))
   
-  # 5b. Dynamically extract layer thicknesses from the interface coordinates (z_i)
-  # note: I checked dz_vals based on the MOM6 grid and these should be correct
-  if ("z_i" %in% names(u_dataset)) {
-    # z_i has length (nz + 1). Its differences yield the nz layer thicknesses.
-    zi_vals <- py_to_r(u_dataset[["z_i"]]$values)
+  #5b. dynamically reconstructing the depth interfaces z_i based on the depth midpoints z_l starting at the surface 0. use dz_val output to check that this
+  # correctly aligns with MOM6 depth bins and isn't bissecting expected thicknesses (confirmation: it does)
+  if ("z_l" %in% names(u_dataset)) {
+    zl_vals <- py_to_r(u_dataset[["z_l"]]$values)
+    nz <- length(zl_vals)
+    
+    # 1. Initialize the interface array (length nz + 1)
+    zi_vals <- numeric(nz + 1)
+    
+    # 2. Assume the surface interface starts at 0 
+    # (Works whether your grid goes positive or negative, as long as it starts at the surface)
+    zi_vals[1] <- 0
+    
+    # 3. Progressively solve for each subsequent interface: z_i[k+1] = 2*z_l[k] - z_i[k]
+    for (k in 1:nz) {
+      zi_vals[k+1] <- 2 * zl_vals[k] - zi_vals[k]
+    }
+    
+    # 4. The thickness of each layer is the absolute difference between its interfaces
     dz_vals <- abs(diff(zi_vals))
     
     # Construct a 1D xarray DataArray mapped to the original unsliced depth axis
@@ -139,7 +155,8 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
       dims = list(depth_name),
       coords = setNames(list(u_dataset[[depth_name]]), depth_name)
     )
-  } 
+  }
+  
   
   # Match the sliced depth footprint of u_selected matrix
   depth_selector <- unname(list(u_selected[[depth_name]])) |> setNames(depth_name)

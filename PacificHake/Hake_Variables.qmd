@@ -461,7 +461,7 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
     u_selected <- u_selected$sel(depth_slice)
     v_selected <- v_selected$sel(depth_slice)
   }
-  
+
   # =========================================================================
   # 3. COORDINATE STANDARDIZATION & DATAFRAME ANGLE MERGING
   # =========================================================================
@@ -534,11 +534,26 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # 5a. Standard coordinate rotation equations
   ua_array <- (v_array_aligned * np$sin(cangle_sliced)) - (u_selected * np$cos(cangle_sliced))
   uc_array <- (v_array_aligned * np$cos(cangle_sliced)) + (u_selected * np$sin(cangle_sliced))
-  
-  # 5b. Dynamically extract layer thicknesses from the interface coordinates (z_i)
-  if ("z_i" %in% names(u_dataset)) {
-    # z_i has length (nz + 1). Its differences yield the nz layer thicknesses.
-    zi_vals <- py_to_r(u_dataset[["z_i"]]$values)
+ 
+  #5b. dynamically reconstructing the depth interfaces z_i based on the depth midpoints z_l starting at the surface 0. use dz_val output to check that this
+  # correctly aligns with MOM6 depth bins and isn't bissecting expected thicknesses (confirmation: it does)
+  if ("z_l" %in% names(u_dataset)) {
+    zl_vals <- py_to_r(u_dataset[["z_l"]]$values)
+    nz <- length(zl_vals)
+    
+    # 1. Initialize the interface array (length nz + 1)
+    zi_vals <- numeric(nz + 1)
+    
+    # 2. Assume the surface interface starts at 0 
+    # (Works whether your grid goes positive or negative, as long as it starts at the surface)
+    zi_vals[1] <- 0
+    
+    # 3. Progressively solve for each subsequent interface: z_i[k+1] = 2*z_l[k] - z_i[k]
+    for (k in 1:nz) {
+      zi_vals[k+1] <- 2 * zl_vals[k] - zi_vals[k]
+    }
+    
+    # 4. The thickness of each layer is the absolute difference between its interfaces
     dz_vals <- abs(diff(zi_vals))
     
     # Construct a 1D xarray DataArray mapped to the original unsliced depth axis
@@ -547,7 +562,8 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
       dims = list(depth_name),
       coords = setNames(list(u_dataset[[depth_name]]), depth_name)
     )
-  } 
+  }
+
 
   
   # Match the sliced depth footprint of u_selected matrix
