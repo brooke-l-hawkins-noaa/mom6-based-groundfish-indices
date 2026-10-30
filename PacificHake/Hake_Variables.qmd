@@ -286,6 +286,7 @@ SSHmsc = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmsc", lifestage_d
 SSHmss = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmss", lifestage_dict, 'MSs',precond=FALSE,TRUE)
 
 TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
+devtools::load_all(here::here())
 
 TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
 
@@ -389,7 +390,7 @@ ASTlarv = transport_3d(ds_xv,ds_yv, ds_depth, coast_points_filtered, lifestage_d
 
 ```{r echo=FALSE}
 
-TEMPpre = annual_mean_3d(ds_temp, ds_depth, FALSE,"thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
+TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
 
 ASTeggs = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg',precond=FALSE, TRUE)
 

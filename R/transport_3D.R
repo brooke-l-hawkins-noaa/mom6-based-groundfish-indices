@@ -1,15 +1,21 @@
+#' Developing a function for 3-dimensional data that calculates transport along-shore
+#' and across shelf simultaneously
+#' using list() 
+#' @author Megan L. Feddern
+#' 
+
 transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_dict, stage, precond, print_counts = TRUE) {
   start_time <- Sys.time()
   cat("--- Calculating 3D Coastal Transport (Alongshore & Cross-shore) ---\n")
   
-  # Fetch native Python built-ins for slicing syntax 
+  # Fetch native Python built-ins for slicing syntax
   py <- import_builtins()
   np <- import("numpy") 
   
   # =========================================================================
   # 1. TEMPORAL FILTERING
   # =========================================================================
-  # here we are just going to slice the months that we need first
+  #here we are just going to slice the months that we need first
   month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
   
   u_selected <- u_dataset[["uo_rotate"]]$sel(time = u_dataset$time$dt$month$isin(month_list))
@@ -30,12 +36,10 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   u_selected <- u_selected$sel(lat = py$slice(min_lat, max_lat))
   v_selected <- v_selected$sel(lat = py$slice(min_lat, max_lat))
   
-  # Detect the depth/vertical coordinate dimension name and then slice
+  # Detect the depth/vertical coordinate dimension name
   # this is probably overkill but its built in flexibility for datasets that may have
-  # different names for depth variables. here it is "z_l" for MOM6 which is the 
+  # different lames for depth variables. here it is "z_l" for MOM6 which is the 
   # center point of the depth grid
-  # GUT CHECK...maybe we want to do this differently? does z_i make more sense so that
-  # you are getting the bottom / top of the dpeth cell
   
   depth_name <- NULL
   available_dims <- py_to_r(py$list(u_selected$dims))
@@ -56,8 +60,9 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
     u_selected <- u_selected$sel(depth_slice)
     v_selected <- v_selected$sel(depth_slice)
   }
+  
   # =========================================================================
-  # 3. COORDINATE STANDARDIZATION & LATITUDE-SPECIFIC ANGLE 
+  # 3. COORDINATE STANDARDIZATION & DATAFRAME ANGLE MERGING
   # =========================================================================
   # In many global ocean models, U and V vectors are calculated on slightly staggered 
   # spatial grids (for MOM6 its the Arakawa C-grids). This section uses linear interpolation
@@ -66,6 +71,9 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # Kelly Kearneys excellent MOM6 grid explainer for more details 
   # https://beringnpz.github.io/ak_regional_mom6/cefi_dataset.html
   
+  # =========================================================================
+  # 3. COORDINATE STANDARDIZATION & LATITUDE-SPECIFIC ANGLE BROADCASTING
+  # =========================================================================
   cat("Standardizing coordinate names and mapping latitude-specific angles...\n")
   dim_keys <- py_to_r(py$list(long_dataset$dims))
   rename_list <- list()
@@ -92,17 +100,15 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # (Since Mike's MATLAB used 'sind/cosd', but Python's NumPy works exclusively in radians)
   angles_rad <- raw_angles_deg * (pi / 180)
   
-  # 3c. Build a 1D xarray for coast angles
+  # 3c. Build a 1D xarray using standard coordinate names ('lat')
   cangle_1d <- xr$DataArray(
     data = angles_rad,
     dims = list("lat"),
     coords = list(lat = coast_lats)
   )
   
-  # 3d. Merge coast angle to the U grid using linear interpolation
+  # 3d. Interpolate the 1D latitude angle vector exactly to the U grid
   # xarray will merge this across time, longitude, and depth dimensions
-  # this uses lazy mathematical broadcasting so other dimensions are not 
-  # stitched to data until section 5
   cangle_sliced <- cangle_1d$interp(lat = u_selected$lat, method = "linear")
   
   
@@ -112,15 +118,15 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # we have a single mask generationg here, because again, we are working with everything
   # translated onto the U grid. Generates an object containing logical TRUE/FALSE 
   # states for every point on the grid. A coordinate point yields TRUE only if 
-  # it matches your latitude box limits, falls within the depth constraints, matches  
-  # long extent (min_iso to max_iso), and does not represent an empty/land data void.
+  # it matches your latitude box limits, falls within the depth constraints 
+  # (min_iso to max_iso), and does not represent an empty/land data void.
   
   py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
     (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
     (mask_sliced <= filter_dict[[stage]][['max_iso']]) & (!mask_sliced$isnull())
   
   # =========================================================================
-  # 5. VECTOR ROTATION & DEPTH THICKNESS CALCULATION
+  # 5. MATHEMATICAL ORIENTATION RESOLUTION & DYNAMIC THICKNESS CALCULATION
   # =========================================================================
   cat("Vector rotation and dynamic cell thickness calculation...\n")
   
@@ -158,6 +164,7 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   }
   
   
+  
   # Match the sliced depth footprint of u_selected matrix
   depth_selector <- unname(list(u_selected[[depth_name]])) |> setNames(depth_name)
   dz_sliced <- dz_full$sel(depth_selector)
@@ -168,15 +175,15 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   dz_masked <- dz_sliced$where(py_mask) # Truncates cleanly at the seafloor bottom depth
   
   # =========================================================================
-  # 6. DEPTH THICKNESS-WEIGHTED VERTICAL MEAN AND SPATIAL AVERAGE
+  # 6. THICKNESS-WEIGHTED VERTICAL COLLAPSE & SPATIAL MEAN
   # =========================================================================
-  cat("Depth thickness weighting and spatial average...\n")
+  cat("Collapsing water column via high-performance thickness weighting...\n")
   
   # 6a. Compute integrated transport over the water column (Velocity * Layer Thickness)
   ua_integrated <- ua_masked * dz_masked
   uc_integrated <- uc_masked * dz_masked
   
-  # 6b. Sum integrated transports and divide by the total unmasked water column thickness
+  # 6b. Sum integrated transports and divide by the total water column thickness
   ua_weighted_vertical_mean <- ua_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
   uc_weighted_vertical_mean <- uc_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
   
@@ -184,7 +191,7 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   horizontal_dims <- py_to_r(py$list(ua_weighted_vertical_mean$dims))
   spatial_dims_to_drop <- horizontal_dims[horizontal_dims != "time"]
   
-  cat("Summarizing mean across lat and long...\n")
+  cat("Aggregating means ...\n")
   ua_series <- ua_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
   uc_series <- uc_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
   
@@ -204,7 +211,7 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # =========================================================================
   # 8. R AGGREGATION & LAGGING WRAPPERS
   # =========================================================================
-  cat("Aggregating annual indices...\n")
+  cat("Aggregating annual timeline numbers in R...\n")
   ds_df_along <- aggregate(u_along ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   ds_df_cross <- aggregate(u_cross ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   
@@ -233,4 +240,3 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   return(ds_df)
   
 }
-

@@ -1,13 +1,40 @@
-#' Developing a function for 3-dimensional data. This is relevant for MLD, SSH, and SST.
+#' Developing a function for 3-dimensional data. This is relevant for MLD,  and SST.
 #' using list() 
 #' @author Megan L. Feddern
-#' 
+
 annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, df_var_name, filter_dict, stage, precond, print_counts = TRUE) {
   start_time <- Sys.time()
   cat(paste0("---", df_var_name, "---\n"))
   
   # Fetch native Python built-ins for slicing syntax
   py <- import_builtins()
+  
+  # Define depth coordinate dimension name explicitly for the reconstruction loop
+  depth_name <- "z_l"
+  
+  # =========================================================================
+  # 0. DYNAMIC CELL THICKNESS RECONSTRUCTION
+  # =========================================================================
+  # this section of code get cell thickness so we can appropriately weight
+  # our averages
+  cat("Reconstructing 1D layer thicknesses (dz) from z_l midpoints...\n")
+  zl_vals <- py_to_r(var_dataset[[depth_name]]$values)
+  nz <- length(zl_vals)
+  
+  zi_vals <- numeric(nz + 1)
+  zi_vals[1] <- 0 # Assume the surface starts at 0m
+  
+  for (k in 1:nz) {
+    zi_vals[k+1] <- 2 * zl_vals[k] - zi_vals[k]
+  }
+  dz_vals <- abs(diff(zi_vals))
+  
+  # Construct a 1D xarray DataArray mapped to the full unsliced depth axis
+  dz_full <- xr$DataArray(
+    data = dz_vals,
+    dims = list(depth_name),
+    coords = setNames(list(var_dataset[[depth_name]]), depth_name)
+  )
   
   # 1. First, filter the variable called in "var_dataset" by month so you are only
   # interacting with the months for the lifestage of interest
@@ -37,6 +64,9 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   
   var_selected <- var_selected$sel(z_l=py$slice(min_depth, max_depth))
   var_array <- var_selected[[ds_var_name]]
+  
+  # Slice our reconstructed 1D layer thicknesses to match the current depth window footprint
+  dz_sliced <- dz_full$sel(setNames(list(py$slice(min_depth, max_depth)), depth_name))
   
   # 4. We need the sliced Earthmover data to be able to be aligned with our masks
   # this will just dynamically rename "latitude" and "longitude" to "lat" "long" in the static datasets
@@ -75,45 +105,55 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   # 5. Use Xarray's interp_like to ensure alignment 
   cat("Interpolating mask grid onto variable layout...\n") 
   
-  if (mask_type == "distance") { 
+  if (!is.null(mask_type) && mask_type == "distance") { 
     mask_sliced <- long_dataset[["dist"]]$interp_like(var_array, method = "nearest") 
     py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_dist']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_dist']]) & 
-      (!mask_sliced$isnull()) 
+      (mask_sliced$notnull()) 
     
-  } else if (mask_type == "isobath") { 
+  } else if (!is.null(mask_type) && mask_type == "isobath") { 
     mask_sliced <- long_dataset[["deptho"]]$interp_like(var_array, method = "nearest") 
     py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
       (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
       (mask_sliced <= filter_dict[[stage]][['max_iso']]) & 
-      (!mask_sliced$isnull()) 
+      (mask_sliced$notnull()) 
     
   } else {
     # Catch-all: Runs if mask_type is "longitude" or any other unrecognized value
-    mask_sliced <- long_dataset[["lon"]]$interp_like(var_array, method = "nearest")
-    py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
-      (mask_sliced >= filter_dict[[stage]][['min_long']]) & 
-      (mask_sliced <= filter_dict[[stage]][['max_long']]) & 
-      (!mask_sliced$isnull())
+    py_mask <- (var_array$lat >= min_lat) & (var_array$lat <= max_lat) & 
+      (var_array$lon >= filter_dict[[stage]][['min_long']]) & 
+      (var_array$lon <= filter_dict[[stage]][['max_long']])
   } 
   
   # 6. Apply the mask layer
-  cat("Applying mask layer...\n")
+  cat("Applying mask layer and masking thicknesses...\n")
   var_masked <- var_array$where(py_mask)
   
-  # This is just a check: Identify remaining spatial dimensions to summarise means over
-  all_dims <- py_to_r(py$list(var_masked$dims))
-  spatial_dims_to_drop <- all_dims[all_dims != "time"]
+  # Mask out layer thickness values where the variable data is null (handles seafloor truncation)
+  # FIXED: Replaced R logic NOT operator (!) with native Python xarray $notnull() function
+  dz_masked <- dz_sliced$where(var_masked$notnull())
   
-  #spatial_dims_to_drop are the spatial dimensions to take a mean over. It should
-  # just be "lat" and "long"
+  # This is just a check: Identify remaining spatial dimensions to summarise means over
+  # (Modified to handle a two-stage spatial collapse incorporating vertical weights)
   
   # 7. Taking the spatial mean 
   # this takes the mean over the defined latitude and the longitudinal extent
   # filtered by the mask.
   cat("Collapsing spatial/depth dimensions natively...\n")
-  spatial_mean_series <- var_masked$mean(dim = spatial_dims_to_drop, skipna = TRUE)
+  
+  # Step 7a: Calculate the vertical depth-weighted average: sum(var * dz) / sum(dz)
+  # This collapses the "z_l" dimension first, turning the data into a 2D spatial plane (time, lat, lon)
+  var_weighted_sum <- (var_masked * dz_masked)$sum(dim = depth_name, skipna = TRUE)
+  dz_sum           <- dz_masked$sum(dim = depth_name, skipna = TRUE)
+  var_depth_mean   <- var_weighted_sum / dz_sum
+  
+  # Step 7b: Identify remaining horizontal spatial dimensions to drop (should be "lat" and "lon")
+  all_remaining_dims <- py_to_r(py$list(var_depth_mean$dims))
+  spatial_dims_to_drop <- all_remaining_dims[all_remaining_dims != "time"]
+  
+  # Take a standard unweighted horizontal spatial mean across the remaining lat/lon coordinates
+  spatial_mean_series <- var_depth_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
   
   # 8. Pull the monthly means
   # you now have monthly means across the defined lat long. We need to pull them into
@@ -127,7 +167,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
     value = raw_values
   )
   
-# 9. Aggregate annual time series using r
+  # 9. Aggregate annual time series using r
   cat("Aggregating annual time series in R...\n")
   ds_df <- aggregate(value ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   
@@ -136,7 +176,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
     cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
     # In a default pandas to_dataframe() conversion with groupby('time.year'),
     # the years are stored as the index (rownames) of the R data frame.
-     current_years <- as.numeric(rownames(ds_df))
+    current_years <- as.numeric(rownames(ds_df))
     lagged_years <- current_years + 1
     rownames(ds_df) <- as.character(lagged_years)
   }
