@@ -71,9 +71,6 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   # Kelly Kearneys excellent MOM6 grid explainer for more details 
   # https://beringnpz.github.io/ak_regional_mom6/cefi_dataset.html
   
-  # =========================================================================
-  # 3. COORDINATE STANDARDIZATION & LATITUDE-SPECIFIC ANGLE BROADCASTING
-  # =========================================================================
   cat("Standardizing coordinate names and mapping latitude-specific angles...\n")
   dim_keys <- py_to_r(py$list(long_dataset$dims))
   rename_list <- list()
