@@ -1,0 +1,684 @@
+---
+title: "Hake_variables"
+format: pdf
+editor: visual
+---
+
+# Setup
+
+```{r}
+# Check current working directory
+devtools::load_all(here::here())
+library(dplyr)
+library(ncdf4)
+library(tidyr)
+library(corrplot)
+library(rerddap)
+library(ggplot2)
+library(rerddap)
+library(ggplot2)
+library(lubridate)
+library(rerddap)
+library(purrr)
+library(stringr)
+library(reticulate)
+```
+
+Next, we need to set up our python environment for reticulate and make sure it is calling the correct version of icechunk and arraylake to be able to interact with Eartmover. Reticulate automatically loads an environment when you start a new session and ensuring the python environment you are using with reticulate is correctly specifying the correct version of python and the Earthmover associated packages is key.
+
+```{r}
+# Force reticulate to pull down the newest package versions
+#reticulate::py_install("dask")
+py_require("icechunk>=2.0.0")
+py_require("arraylake>=1.0.0")
+py_require("zarr")
+py_require("h5netcdf")
+py_require("h5py")
+py_require("xarray")
+py_require("scipy")
+py_require("dask")
+# Import the fresh libraries
+arraylake <- import("arraylake") #the data visual layer of Earthmover
+zarr <- import("zarr") #interact with compressed data chunks and JSON metadata
+xr   <- import("xarray") #python library for working with arrays
+np   <- np <- import("numpy", convert = FALSE) #necessary for the NaN checking block
+pd   <- import("pandas")
+time <- import("time")
+dask <- import("dask")
+
+# Verify the version 
+print(arraylake$`__version__`) 
+```
+
+Now we will load the data from Earthmover and a static .netcdf. Whether or not this loads correctly will identify whether the python environment is loaded correctly in R and may require trounblshooting
+
+```{r}
+# Connect to your NOAA data repository
+client <- arraylake$Client()
+#token issue? go to terminal arraylake auth login
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly") 
+print(repo)
+
+# did you get an authentication error? if so run the login code below to 
+# reauthenticate and follow the login prompts
+# client$login() 
+#If this runs then Earthmover is functioning!
+
+ds_depth = xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+
+#If this runs then xarray has appropriate dependencies loaded
+
+```
+
+```{r}
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+lifestage_dict <- list(
+  prec = list( # spawn
+    min_month = 4,
+    max_month = 10,
+    min_lat   = 42,
+    max_lat   = 47,
+    min_depth = 50.0,
+    max_depth = 350.0,
+    min_iso = 100,
+    max_iso=2000
+  ), 
+   spawn = list( # spawn
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 130,
+    max_depth = 500, 
+    min_iso = 100,
+    max_iso=2000 
+  ), #long extent shelf break
+  egg = list( # eggs
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 40,
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    egg.s = list( # eggs
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 40,
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    egg.n = list( # eggs
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 40,
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+  ),
+  yolk = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 50, 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
+  ),   
+  yolk.s = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50, 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    yolk.n = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 50, 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
+  ),
+  ja.c = list( # JAc
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 34.5,
+    max_lat   = 42.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    ja.s = list( # JAs
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    ms.c = list( # MSc
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 34.5,
+    max_lat   = 42.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    ms.s = list( # MSs
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    ms.n = list( # MSn
+    min_month = 5,
+    max_month = 9,
+    min_lat   = 42.5,
+    max_lat   = 47,
+    min_depth = 30,
+    max_depth = 130,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    larv = list( # larv
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 31,
+    max_lat   = 36,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    larv.n = list( # larv.n
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    larv.s = list( # larv.s
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+  latelarv = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 31,
+    max_lat   = 37,
+    min_depth = 50,
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    latelarv.s = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50,
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    latelarv.n = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 34.5,
+    max_lat   = 37,
+    min_depth = 50,
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+  late = list( # late
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 33.5,
+    max_lat   = 34.5,
+    min_depth = 75,
+    max_depth = 275
+  ),
+    JA = list( # Jan to april
+    min_month = 1,
+    max_month = 4
+  ),
+  AS = list( # April to september
+    min_month = 4,
+    max_month = 9
+  ), #long extent shelf break
+  pjuv.age.0 = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 38,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  pjuv.age.0.n = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 34.5,
+    max_lat   = 38,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  pjuv.age.0.s = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  Tcop = list( # age0
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 40,
+    max_lat   = 48,
+    min_depth = 90,
+    max_depth = 180,
+    min_iso = 1,
+    max_iso=1200
+  ), 
+  Tpart = list( # age0
+    min_month = 8,
+    max_month = 10,
+    min_lat   = 40,
+    max_lat   = 48,
+    min_depth = 0,
+    max_depth = 180,
+    min_iso = 1,
+    max_iso=1200
+)
+)
+```
+
+```{r echo=FALSE}
+
+# 1. Load local NetCDF datasets using xarray
+# depth is used to filter longitudinal extent based on isobath
+ds_depth <- xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+# depth is used to filter longitudinal extent based on distance from shore
+# 1. Open the raw file
+ds_dist_raw <- xr$open_dataset("../STATIC/mom6-nep_regrid_dist2coast_CCS.nc")
+
+# 2. Safely isolate the true geographic decimal vectors from the 2D matrix arrays
+# Since they are stored as variables, we can extract the true linear coordinates
+true_lat_vector <- py_to_r(ds_dist_raw[["lat"]]$values[, 1])
+true_lon_vector_raw <- py_to_r(ds_dist_raw[["lon"]]$values[1, ])
+
+# 3. Convert Longitude map from (-180 to 180) into (0 to 360) global scale
+# This ensures that -125 degrees west maps to 235 degrees global
+true_lon_vector <- (true_lon_vector_raw %% 360)
+
+# 4. Wipe out the old placeholder data variables to prevent name collisions
+ds_dist_clean <- ds_dist_raw$drop_vars(list("lat", "lon"))
+
+# 5. Overwrite the generic index coordinates with your true geographical decimals
+ds_dist_assigned <- ds_dist_clean$assign_coords(list(
+  latitude = true_lat_vector,
+  longitude = true_lon_vector
+))
+
+# 6. Standardize the dimension labels to match your main data exactly
+ds_dist <- ds_dist_assigned$rename(list(latitude = "lat", longitude = "lon"))
+
+# Verify the changes (You will see active asterisks * next to true decimal coordinates!)
+print(ds_dist)
+```
+
+```{r echo=FALSE}
+
+# 2. Connect to Earthmover Arraylake
+client <- arraylake$Client()
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly")
+session <- repo$readonly_session(branch = "main")
+
+# Load aux group Zarr data - this is data that is not a direct main output (it is calculated from model output)
+aux <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/aux1")
+# Load the main group Zarr data 
+main <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/main")
+# Use list() to match Python's double bracket [['MLD_003']] dataset subsetting
+ds_mld <- aux[list("MLD_003")]
+ds_temp = main[list('thetao')]
+ds_xv = main[list('uo_rotate')]
+ds_yv = main[list('vo_rotate')]
+ds_ssh = aux[list('ssh')]
+
+```
+
+Lets start with data that is 2-dimensional using the 2-d function, this is primarily MLD and SSH
+
+```{r echo=FALSE}
+
+
+MLDegg = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDegg", lifestage_dict, 'egg',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
+
+MLDlatelarv = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv', precond=FALSE, TRUE)
+
+MLDyolk = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
+
+MLDlarv = annual_mean_2d(ds_mld, ds_depth, "isobath", "MLD_003", "MLDlarv", lifestage_dict, 'yolk',precond=FALSE,TRUE)
+
+#Run SSH code
+SSHjac = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.c", lifestage_dict, 'ja.c',precond=FALSE,TRUE)
+
+SSHjas = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.s", lifestage_dict, 'ja.s',precond=FALSE,TRUE)
+
+SSHmsc = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.c", lifestage_dict, 'ms.c',precond=FALSE,TRUE)
+
+SSHmss = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.s", lifestage_dict, 'ms.s',precond=FALSE,TRUE)
+
+SSHjacpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.c.pre", lifestage_dict, 'ja.c',precond=TRUE,TRUE)
+
+SSHjaspre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.s.pre", lifestage_dict, 'ja.s',precond=TRUE,TRUE)
+
+SSHmscpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.c.pre", lifestage_dict, 'ms.c',precond=TRUE,TRUE)
+
+SSHmsnpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.n.pre", lifestage_dict, 'ms.n',precond=TRUE,TRUE)
+
+twod.ls <- list(SSHmsnpre, SSHmscpre, SSHjaspre, SSHjacpre, SSHmss, SSHmsc, SSHjas, SSHjac, MLDlarv, MLDyolk, MLDlatelarv,MLDegg)
+updated_list <- map(twod.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+```
+
+Now lets do the 3-d variables
+
+```{r echo=FALSE}
+TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
+
+TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
+
+TEMPcop = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tcop", lifestage_dict, 'Tcop',precond=TRUE,TRUE)
+
+TEMPpart = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tpart", lifestage_dict, 'Tpart',precond=FALSE,TRUE)
+
+twod.ls <- list(TEMPspawn,TEMPpre,TEMPcop,TEMPpart)
+updated_list <- map(twod.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+```
+
+
+```{r echo=FALSE}
+library(ncdf4)
+
+# 1. Open the attached netCDF file
+nc_data <- xr$open_dataset("../STATIC/mom6_regrid_coastangle_CCS.nc")
+
+ASTage0 = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0',precond=FALSE, TRUE)
+
+ASTegg.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg.s',precond=FALSE, TRUE)
+
+ASTlarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv',precond=FALSE, TRUE)
+
+ASTlatelarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv',precond=FALSE, TRUE)
+
+ASTyolk = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk',precond=FALSE, TRUE)
+
+ASTegg.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg',precond=FALSE, TRUE)
+
+CSTpjuv.age.0.s  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0.s',precond=FALSE, TRUE)
+
+CSTpjuv.age.0.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0.n',precond=FALSE, TRUE)
+
+CSTegg.n = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg.n',precond=FALSE, TRUE)
+
+CSTlarv.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv.n',precond=FALSE, TRUE)
+
+CSTlarv.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv.s',precond=FALSE, TRUE)
+
+CSTlatelarv.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv.n',precond=FALSE, TRUE)
+
+CSTlatelarv.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv.s',precond=FALSE, TRUE)
+
+CSTyolk.n = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk.n',precond=FALSE, TRUE)
+
+CSTyolk.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk.s',precond=FALSE, TRUE)
+
+transport.ls <- list(CSTyolk.s, CSTyolk.n, CSTlatelarv.s, CSTlatelarv.n, CSTlarv.s, CSTlarv.n, CSTegg.n, CSTpjuv.age.0.n, CSTpjuv.age.0.s,ASTegg.s, ASTyolk, ASTlatelarv, ASTlarv, ASTage0)
+updated_list <- map(transport.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+u_dataset =ds_xv
+v_dataset= ds_yv
+long_dataset=ds_depth
+coast_ds=nc_data
+filter_dict=lifestage_dict
+stage='egg.n'
+precond=FALSE
+print_counts=TRUE
+
+
+```
+ROMS comparison
+```{r echo=FALSE}
+new_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.2011.2021.csv")
+old_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.1980.2010.csv")
+roms<-new_roms%>%bind_rows(old_roms)%>%
+  mutate(model="ROMS")
+
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")%>%select(year,Tcop,Tpart,model)
+
+glorys<-read.csv("2024Env-annual-yellowtail_GLORYS_UNSTANDARDIZED.csv")%>%
+  mutate(model="glorys")
+
+ roms_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+ 
+ 
+mom6_long_alt<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+ 
+mom6_long<-transport_df%>%
+  mutate(model="MOM6")%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+
+mom6_roms<-mom6_long%>%
+  bind_rows(roms_long)%>%
+  bind_rows(mom6_long_alt)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(roms_long$variable)))
+
+mom6_roms_corr<-mom6_long%>%#select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(roms_long)%>%#select(-model))%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_roms= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_roms),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+ 
+  cor(mom6_roms_corr$standardized_mom6, mom6_roms_corr$standardized_roms)
+  
+unstandardized<-ggplot(data=mom6_roms, aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+mom6_roms_stand<-mom6_roms%>%
+  group_by(model, variable)%>%
+  group_by(model)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()#%>%
+ # left_join(data.frame(mom6_roms_corr))
+
+standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model))+
+  geom_line()+
+  facet_wrap(~variable)+
+  ggtitle("Standardized")+
+  #geom_text(aes(x = 1995, y = 2, label =corr) ) +
+  theme_classic()
+
+
+ggsave(
+  filename = "unstandardized3d.png",
+  plot = unstandardized,
+  width = 8,       # Horizontal width
+  height = 6,      # Vertical height
+  units = "in",    # Units for width/height ("in", "cm", "mm", or "px")
+  dpi = 300        # 300 DPI is standard print/publication quality
+)
+
+ggsave(
+  filename = "standardized3d.png",
+  plot = standardized,
+  width = 8,       # Horizontal width
+  height = 6,      # Vertical height
+  units = "in",    # Units for width/height ("in", "cm", "mm", or "px")
+  dpi = 300        # 300 DPI is standard print/publication quality
+)
+```
+
+```{r echo=FALSE}
+
+
+climate_datasets <- data.frame(
+  variable=c("NPGO", "PDO"),
+  dataset_id=c( "cciea_OC_NPGO","cciea_OC_PDO") 
+)
+
+compiled_dataset<-NULL
+for(i in 1:length(climate_datasets)){
+    temp<-fetch_erddap_metric(dataset_id = climate_datasets$dataset_id[i], variable = climate_datasets$variable[i])
+    # Fetch the raw data for the current row
+    var_name <- climate_datasets$variable[i]
+    # 3. Combine the data dynamically
+    if (is.null(compiled_dataset)) {
+      # First iteration: initialize the dataset with the first metric
+      compiled_dataset <- temp
+    } else {
+      # Subsequent iterations: join side-by-side on the 'time' column
+      compiled_dataset <- dplyr::full_join(compiled_dataset, temp, by = "time")
+    }
+    # Clean columns inside the loop so joining works seamlessly
+    
+}
+
+
+compiled_dataset$month <- lubridate::month(compiled_dataset$time)
+compiled_dataset$day   <- format(compiled_dataset$time, "%d")
+compiled_dataset$year   <- lubridate::year(compiled_dataset$time)
+
+cleaned_dataset<-compiled_dataset
+
+# 3. Summarize metrics across each element of lifestage_dict dynamically
+lifestage_summaries <- lapply(names(lifestage_dict), function(stage_name) {
+  
+  mn <- lifestage_dict[[stage_name]]$min_month
+  mx <- lifestage_dict[[stage_name]]$max_month
+  
+
+    stage_data <- cleaned_dataset %>% filter(month >= mn & month <= mx)
+ 
+  
+  summary_stats <- stage_data %>%
+    group_by(year) %>%
+    summarise(
+      across(
+        all_of(climate_datasets$variable), 
+        ~ mean(.x, na.rm = TRUE), 
+        .names = "{.col}"  # Creates: mean_NPGO, mean_PDO, etc.
+      ),
+      .groups = 'drop'
+    ) %>%
+    mutate(lifestage = stage_name)
+  
+  return(summary_stats)
+}) %>% 
+  bind_rows()
+
+# 4. Reshape the dataset into a wide format grouped by Year
+wide_lifestage_summary <- lifestage_summaries %>%
+  pivot_wider(
+    names_from = lifestage,
+    values_from = c(-year, -lifestage),
+    # This reshapes names from "mean_NPGO" + "JA" into "mean_NPGO_JA"
+    names_glue = "{.value}{lifestage}"
+  )
+
+# View your tidy, single-row-per-year database structure
+print(head(wide_lifestage_summary))
+
+# 5. Calculate lagged variables
+lag<-1
+preconditioning <-wide_lifestage_summary%>%
+  mutate(year=year+lag)%>%
+  select(c(year,contains("AS")))%>%
+  rename_with(~ str_replace(.x, "AS$", "_pre"), ends_with("AS"))
+
+# 6. Full dataset
+full_dataset <- left_join(preconditioning,wide_lifestage_summary)
+write.csv(full_dataset, "Output/ERRDAP_var.csv", row.names = FALSE)
+
+```

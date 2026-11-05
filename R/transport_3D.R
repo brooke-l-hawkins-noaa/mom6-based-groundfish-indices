@@ -51,19 +51,23 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   
   # 2a. Replicate MATLAB index-position averaging: u_psi = (u(:,1:end-1,:)+u(:,2:end,:))/2;
   # We extract underlying array values to prevent xarray from misaligning differing coordinate tags (i.e, stripping away the coordinate tracking of xarray)
-  u_part1 <- u_selected$isel(lat = py$slice(0L, -1L))
-  u_part2 <- u_selected$isel(lat = py$slice(1L, NULL))
-  u_psi_values <- (u_part1$values + u_part2$values) / 2
-  u_array_aligned <- u_part1$copy(data = u_psi_values)
+  #u_part1 <- u_selected$isel(lat = py$slice(0L, -1L))
+  #u_part2 <- u_selected$isel(lat = py$slice(1L, NULL))
+  #u_psi_values <- (u_part1$values + u_part2$values) / 2
+  #u_array_aligned <- u_part1$copy(data = u_psi_values)
+  u_array_aligned<- u_selected
   
   # 2b. Replicate MATLAB index-position averaging: v_psi = (v(1:end-1,:,:)+v(2:end,:,:))/2;
-  v_part1 <- v_selected$isel(lon = py$slice(0L, -1L))
-  v_part2 <- v_selected$isel(lon = py$slice(1L, NULL))
-  v_psi_values <- (v_part1$values + v_part2$values) / 2
-  v_array_aligned <- v_part1$copy(data = v_psi_values)
+  #v_part1 <- v_selected$isel(lon = py$slice(0L, -1L))
+  #v_part2 <- v_selected$isel(lon = py$slice(1L, NULL))
+  #v_psi_values <- (v_part1$values + v_part2$values) / 2
+  #v_array_aligned <- v_part1$copy(data = v_psi_values)
+  v_array_aligned<- v_selected
+  
   
   # 2c. align the lontitudinal dataset with the psi grid 
   mask_sliced <- long_dataset[["deptho"]]$interp_like(u_array_aligned, method = "nearest")
+ 
   
   # 2e. Extract the raw angle and latitude coordinates
   raw_angles_deg <- py_to_r(coast_ds[["coast_angle"]]$values)
@@ -75,8 +79,8 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   
   # 2g. Interpolate the 1D latitude angle vector to the U grid
   target_lats <- py_to_r(u_array_aligned$lat$values)
-  valid_idx <- !is.na(coast_lats) & !is.na(angles_rad)
-  clean_lats <- coast_lats[valid_idx]
+  valid_idx <- !is.na(coast_lats) & !is.na(angles_rad) #boolean maske for the angles that have values
+  clean_lats <- coast_lats[valid_idx] # 
   clean_angles <- angles_rad[valid_idx]
   
   if (length(unique(clean_lats)) >= 2) {
@@ -93,7 +97,7 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
     dims = list("lat"),
     coords = list(lat = u_array_aligned$lat)
   )
-  
+ 
   # =========================================================================
   # 3. MASK GENERATION FOR LONGITUDINAL EXTENT
   # =========================================================================
@@ -191,8 +195,8 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   ds_df$year <- NULL
   
   # 7d. Dynamically rename the columns based on the current active 'stage' string
-  ast_name <- paste0("AST_", stage)
-  cst_name <- paste0("CST_", stage)
+  ast_name <- paste0("AST", stage)
+  cst_name <- paste0("CST", stage)
   colnames(ds_df) <- c(ast_name, cst_name)
   
   rm(temp_df, raw_ua, raw_uc, r_years)

@@ -96,20 +96,42 @@ lifestage_dict <- list(
     min_iso = 100,
     max_iso=2000 
   ), #long extent shelf break
-  egg = list( # egg
+  egg = list( # eggs
     min_month = 1,
     max_month = 3,
-    min_lat   = 40,
-    max_lat   = 60,
+    min_lat   = 31,
+    max_lat   = 36,
     min_depth = 40,
     max_depth = 60,
     min_iso = 100,
     max_iso=2000,
     max_dist = 30,
     min_dist = 0
-
   ),
-  
+    egg.s = list( # eggs
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 40,
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+  ),
+    egg.n = list( # eggs
+    min_month = 1,
+    max_month = 3,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 40,
+    max_depth = 60,
+    min_iso = 100,
+    max_iso=2000,
+    max_dist = 30,
+    min_dist = 0
+  ),
   yolk = list( # yolk
     min_month = 1,
     max_month = 4,
@@ -119,8 +141,28 @@ lifestage_dict <- list(
     max_depth = 100, 
     min_iso = 100,
     max_iso=2000 
-  ), #long extent shelf break
-  JAc = list( # JAc
+  ),   
+  yolk.s = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50, 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    yolk.n = list( # yolk
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 50, 
+    max_depth = 100, 
+    min_iso = 100,
+    max_iso=2000 
+  ),
+  ja.c = list( # JAc
     min_month = 1,
     max_month = 4,
     min_lat   = 34.5,
@@ -130,7 +172,7 @@ lifestage_dict <- list(
     max_dist = 30,
     min_dist = 0
   ),
-    JAs = list( # JAs
+    ja.s = list( # JAs
     min_month = 1,
     max_month = 4,
     min_lat   = 31,
@@ -140,7 +182,7 @@ lifestage_dict <- list(
     max_dist = 30,
     min_dist = 0
   ),
-    MSc = list( # MSc
+    ms.c = list( # MSc
     min_month = 5,
     max_month = 9,
     min_lat   = 34.5,
@@ -150,7 +192,7 @@ lifestage_dict <- list(
     max_dist = 30,
     min_dist = 0
   ),
-    MSs = list( # MSs
+    ms.s = list( # MSs
     min_month = 5,
     max_month = 9,
     min_lat   = 31,
@@ -160,7 +202,7 @@ lifestage_dict <- list(
     max_dist = 30,
     min_dist = 0
   ),
-    MSn = list( # MSn
+    ms.n = list( # MSn
     min_month = 5,
     max_month = 9,
     min_lat   = 42.5,
@@ -180,10 +222,50 @@ lifestage_dict <- list(
     min_iso = 100,
     max_iso=2000 
   ),
+    larv.n = list( # larv.n
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 34.5,
+    max_lat   = 36,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    larv.s = list( # larv.s
+    min_month = 2,
+    max_month = 5,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50,
+    max_depth = 200,
+    min_iso = 100,
+    max_iso=2000 
+  ),
   latelarv = list( # latelarv
     min_month = 3,
     max_month = 6,
     min_lat   = 31,
+    max_lat   = 37,
+    min_depth = 50,
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    latelarv.s = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 50,
+    max_depth = 300,
+    min_iso = 100,
+    max_iso=2000 
+  ),
+    latelarv.n = list( # latelarv
+    min_month = 3,
+    max_month = 6,
+    min_lat   = 34.5,
     max_lat   = 37,
     min_depth = 50,
     max_depth = 300,
@@ -205,9 +287,58 @@ lifestage_dict <- list(
   AS = list( # April to september
     min_month = 4,
     max_month = 9
-  )
+  ), #long extent shelf break
+  pjuv.age.0 = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 38,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  pjuv.age.0.n = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 34.5,
+    max_lat   = 38,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  pjuv.age.0.s = list( # age0
+    min_month = 4,
+    max_month = 9,
+    min_lat   = 31,
+    max_lat   = 34.5,
+    min_depth = 0,
+    max_depth = 50,
+    min_iso = 0,
+    max_iso=200
+  ), 
+  Tcop = list( # age0
+    min_month = 1,
+    max_month = 4,
+    min_lat   = 40,
+    max_lat   = 48,
+    min_depth = 90,
+    max_depth = 180,
+    min_iso = 1,
+    max_iso=1200
+  ), 
+  Tpart = list( # age0
+    min_month = 8,
+    max_month = 10,
+    min_lat   = 40,
+    max_lat   = 48,
+    min_depth = 0,
+    max_depth = 180,
+    min_iso = 1,
+    max_iso=1200
 )
-
+)
 ```
 
 ```{r echo=FALSE}
@@ -264,33 +395,220 @@ ds_ssh = aux[list('ssh')]
 
 ```
 
+Lets start with data that is 2-dimensional using the 2-d function, this is primarily MLD and SSH
+
 ```{r echo=FALSE}
 
-#py <- import_builtins()
-#library(reticulate)
-#Run MLD code
+
 MLDegg = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDegg", lifestage_dict, 'egg',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
 
 MLDlatelarv = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDlatelarv", lifestage_dict, 'latelarv', precond=FALSE, TRUE)
 
-MLDyolk = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
+MLDyolk = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDyolk", lifestage_dict, 'yolk',precond=FALSE, TRUE)
 
-MLDlarv = annual_mean_2d(ds_mld, ds_depth, "isobath", "MLD_003", "MLDlateyolk", lifestage_dict, 'yolk',precond=FALSE,TRUE)
+MLDlarv = annual_mean_2d(ds_mld, ds_depth, "isobath", "MLD_003", "MLDlarv", lifestage_dict, 'yolk',precond=FALSE,TRUE)
 
 #Run SSH code
-SSHjac = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHjac", lifestage_dict, 'JAc',precond=FALSE,TRUE)
+SSHjac = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.c", lifestage_dict, 'ja.c',precond=FALSE,TRUE)
 
-SSHjas = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHjas", lifestage_dict, 'JAs',precond=FALSE,TRUE)
+SSHjas = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.s", lifestage_dict, 'ja.s',precond=FALSE,TRUE)
 
-SSHmsc = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmsc", lifestage_dict, 'MSc',precond=FALSE,TRUE)
+SSHmsc = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.c", lifestage_dict, 'ms.c',precond=FALSE,TRUE)
 
-SSHmss = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHmss", lifestage_dict, 'MSs',precond=FALSE,TRUE)
+SSHmss = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.s", lifestage_dict, 'ms.s',precond=FALSE,TRUE)
+
+SSHjacpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.c.pre", lifestage_dict, 'ja.c',precond=TRUE,TRUE)
+
+SSHjaspre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHja.s.pre", lifestage_dict, 'ja.s',precond=TRUE,TRUE)
+
+SSHmscpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.c.pre", lifestage_dict, 'ms.c',precond=TRUE,TRUE)
+
+SSHmsnpre = annual_mean_2d(ds_ssh, ds_dist, "distance","ssh", "SSHms.n.pre", lifestage_dict, 'ms.n',precond=TRUE,TRUE)
+
+twod.ls <- list(SSHmsnpre, SSHmscpre, SSHjaspre, SSHjacpre, SSHmss, SSHmsc, SSHjas, SSHjac, MLDlarv, MLDyolk, MLDlatelarv,MLDegg)
+updated_list <- map(twod.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+```
+
+Now lets do the 3-d variables
+
+```{r echo=FALSE}
+
+var_dataset=ds_temp
+long_dataset=ds_depth
+mask_type="isobath"
+ds_var_name="thetao"
+df_var_name="TEMPpre"
+filter_dict=lifestage_dict
+stage='prec'
+precond=TRUE 
+print_counts = TRUE
 
 TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
 
 TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
 
+TEMPcop = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tcop", lifestage_dict, 'Tcop',precond=TRUE,TRUE)
 
+TEMPpart = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tpart", lifestage_dict, 'Tpart',precond=FALSE,TRUE)
+
+twod.ls <- list(TEMPspawn,TEMPpre,TEMPcop,TEMPpart)
+updated_list <- map(twod.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+```
+
+
+```{r echo=FALSE}
+library(ncdf4)
+
+# 1. Open the attached netCDF file
+nc_data <- xr$open_dataset("../STATIC/mom6_regrid_coastangle_CCS.nc")
+
+ASTage0 = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0',precond=FALSE, TRUE)
+
+ASTegg.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg.s',precond=FALSE, TRUE)
+
+ASTlarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv',precond=FALSE, TRUE)
+
+ASTlatelarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv',precond=FALSE, TRUE)
+
+ASTyolk = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk',precond=FALSE, TRUE)
+
+ASTegg.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg',precond=FALSE, TRUE)
+
+CSTpjuv.age.0.s  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0.s',precond=FALSE, TRUE)
+
+CSTpjuv.age.0.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'pjuv.age.0.n',precond=FALSE, TRUE)
+
+CSTegg.n = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg.n',precond=FALSE, TRUE)
+
+CSTlarv.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv.n',precond=FALSE, TRUE)
+
+CSTlarv.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv.s',precond=FALSE, TRUE)
+
+CSTlatelarv.n  = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv.n',precond=FALSE, TRUE)
+
+CSTlatelarv.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv.s',precond=FALSE, TRUE)
+
+CSTyolk.n = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk.n',precond=FALSE, TRUE)
+
+CSTyolk.s = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'yolk.s',precond=FALSE, TRUE)
+
+transport.ls <- list(CSTyolk.s, CSTyolk.n, CSTlatelarv.s, CSTlatelarv.n, CSTlarv.s, CSTlarv.n, CSTegg.n, CSTpjuv.age.0.n, CSTpjuv.age.0.s,ASTegg.s, ASTyolk, ASTlatelarv, ASTlarv, ASTage0)
+updated_list <- map(transport.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+
+u_dataset =ds_xv
+v_dataset= ds_yv
+long_dataset=ds_depth
+coast_ds=nc_data
+filter_dict=lifestage_dict
+stage='egg.n'
+precond=FALSE
+print_counts=TRUE
+
+
+```
+ROMS comparison
+```{r echo=FALSE}
+new_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.2011.2021.csv")
+old_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.1980.2010.csv")
+roms<-new_roms%>%bind_rows(old_roms)%>%
+  mutate(model="ROMS")
+
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")%>%select(year,Tcop,Tpart,model)
+
+glorys<-read.csv("2024Env-annual-yellowtail_GLORYS_UNSTANDARDIZED.csv")%>%
+  mutate(model="glorys")
+
+ roms_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+ 
+ 
+mom6_long_alt<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+ 
+mom6_long<-transport_df%>%
+  mutate(model="MOM6")%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+
+mom6_roms<-mom6_long%>%
+  bind_rows(roms_long)%>%
+  bind_rows(mom6_long_alt)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(roms_long$variable)))
+
+mom6_roms_corr<-mom6_long%>%#select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(roms_long)%>%#select(-model))%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_roms= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_roms),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+ 
+  cor(mom6_roms_corr$standardized_mom6, mom6_roms_corr$standardized_roms)
+  
+unstandardized<-ggplot(data=mom6_roms, aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+mom6_roms_stand<-mom6_roms%>%
+  group_by(model, variable)%>%
+  group_by(model)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()#%>%
+ # left_join(data.frame(mom6_roms_corr))
+
+standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model))+
+  geom_line()+
+  facet_wrap(~variable)+
+  ggtitle("Standardized")+
+  #geom_text(aes(x = 1995, y = 2, label =corr) ) +
+  theme_classic()
+
+
+ggsave(
+  filename = "unstandardized3d.png",
+  plot = unstandardized,
+  width = 8,       # Horizontal width
+  height = 6,      # Vertical height
+  units = "in",    # Units for width/height ("in", "cm", "mm", or "px")
+  dpi = 300        # 300 DPI is standard print/publication quality
+)
+
+ggsave(
+  filename = "standardized3d.png",
+  plot = standardized,
+  width = 8,       # Horizontal width
+  height = 6,      # Vertical height
+  units = "in",    # Units for width/height ("in", "cm", "mm", or "px")
+  dpi = 300        # 300 DPI is standard print/publication quality
+)
 ```
 
 ```{r echo=FALSE}
@@ -373,427 +691,5 @@ preconditioning <-wide_lifestage_summary%>%
 # 6. Full dataset
 full_dataset <- left_join(preconditioning,wide_lifestage_summary)
 write.csv(full_dataset, "Output/ERRDAP_var.csv", row.names = FALSE)
-
-```
-
-```{r echo=FALSE}
-library(ncdf4)
-
-# 1. Open the attached netCDF file
-nc_data <- xr$open_dataset("../STATIC/mom6_regrid_coastangle_CCS.nc")
-
-TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
-
-ASTeggs = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'egg',precond=FALSE, TRUE)
-
-ASTlarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'larv',precond=FALSE, TRUE)
-ASTlatelarv = transport_3d(ds_xv,ds_yv, ds_depth, nc_data, lifestage_dict, 'latelarv',precond=FALSE, TRUE)
-
-
-```
-
-```{r echo=FALSE}
-EKEJAc = surface_eke_3d(ds_xv,ds_yv,ds_dist, "distance", lifestage_dict, 'JAc',precond=FALSE, TRUE)
-
-
-
-u_dataset =ds_xv
-v_dataset = ds_yv
-long_dataset =ds_depth
-coast_ds=  nc_data
-filter_dict =lifestage_dict
-stage ='egg'
-precond = FALSE
-print_counts = TRUE
-mask_type = "distance"
-
-transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_dict, stage, precond, print_counts = TRUE) {
-  start_time <- Sys.time()
-  cat("--- Calculating 3D Coastal Transport (Alongshore & Cross-shelf) ---\n")
-  
-  # Fetch native Python built-ins for slicing syntax
-  py <- import_builtins()
-  np <- import("numpy")
-  
-  # =========================================================================
-  # 1. SLICING TO THE DATA WE WANT
-  # =========================================================================
-  
-  # 1A. temporal slicing of months
-  month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
-  
-  u_selected <- u_dataset[["uo_rotate"]]$sel(time = u_dataset$time$dt$month$isin(month_list))
-  v_selected <- v_dataset[["vo_rotate"]]$sel(time = v_dataset$time$dt$month$isin(month_list))
-  
-  py_years <- u_selected$time$dt$year$values
-  r_years <- py_to_r(py_years)
-  
-  # 1b. latitudinal bounds
-  min_lat <- as.numeric(filter_dict[[stage]][["min_lat"]])
-  max_lat <- as.numeric(filter_dict[[stage]][["max_lat"]])
-  
-  cat("Slicing spatial boundaries for U and V components...\n")
-  u_selected <- u_selected$sel(lat = py$slice(min_lat, max_lat))
-  v_selected <- v_selected$sel(lat = py$slice(min_lat, max_lat))
-  
-  # 1c. depths bounds
-  depth_name <- "z_l"
-  min_depth <- as.numeric(filter_dict[[stage]][["min_depth"]])
-  max_depth <- as.numeric(filter_dict[[stage]][["max_depth"]])
-
-    
-    depth_slice <- unname(list(py$slice(min_depth, max_depth))) |> setNames(depth_name)
-    u_selected <- u_selected$sel(depth_slice)
-    v_selected <- v_selected$sel(depth_slice)
-
-  # from here on out we are working with u and v data that already has the lat, depth, 
-  # and month domains that we want
-  # =========================================================================
-  # 2. ALIGNMENT VIA C-GRID INDEX SHIFTING (PSI GRID TRANSFORMATION)
-  # =========================================================================
-  cat("Transforming components to shared PSI grid via C-grid index shifts...\n")
-  
-# 2a. Replicate MATLAB index-position averaging: u_psi = (u(:,1:end-1,:)+u(:,2:end,:))/2;
-  # We extract underlying array values to prevent xarray from misaligning differing coordinate tags (i.e, stripping away the coordinate tracking of xarray)
-  u_part1 <- u_selected$isel(lat = py$slice(0L, -1L))
-  u_part2 <- u_selected$isel(lat = py$slice(1L, NULL))
-  u_psi_values <- (u_part1$values + u_part2$values) / 2
-  u_array_aligned <- u_part1$copy(data = u_psi_values)
-  
-  # 2b. Replicate MATLAB index-position averaging: v_psi = (v(1:end-1,:,:)+v(2:end,:,:))/2;
-  v_part1 <- v_selected$isel(lon = py$slice(0L, -1L))
-  v_part2 <- v_selected$isel(lon = py$slice(1L, NULL))
-  v_psi_values <- (v_part1$values + v_part2$values) / 2
-  v_array_aligned <- v_part1$copy(data = v_psi_values)
-  
-  # 2c. align the lontitudinal dataset with the psi grid 
-  mask_sliced <- long_dataset[["deptho"]]$interp_like(u_array_aligned, method = "nearest")
-
-  # 2e. Extract the raw angle and latitude coordinates
-  raw_angles_deg <- py_to_r(coast_ds[["coast_angle"]]$values)
-  coast_lats <- py_to_r(coast_ds[["lat"]]$values)
-  
-  # 2f. Convert degrees to radians for use with np$sin/np$cos
-  # (Since Mike's MATLAB used 'sind/cosd', but Python's NumPy works exclusively in radians)
-  angles_rad <- raw_angles_deg * (pi / 180)
-  
-  # 2g. Interpolate the 1D latitude angle vector to the U grid
- target_lats <- py_to_r(u_array_aligned$lat$values)
-  valid_idx <- !is.na(coast_lats) & !is.na(angles_rad)
-  clean_lats <- coast_lats[valid_idx]
-  clean_angles <- angles_rad[valid_idx]
-  
-  if (length(unique(clean_lats)) >= 2) {
-    interp_angles <- approx(x = clean_lats, y = clean_angles, xout = target_lats, method = "linear", rule = 2)$y
-  } else if (length(clean_angles) > 0) {
-    interp_angles <- rep(clean_angles, length(target_lats))
-  } else {
-    interp_angles <- rep(0, length(target_lats))
-  }
-  
-  # We enforce matching sizes by assigning data evaluated against u_array_aligned$lat directly to u_array_aligned$lat coords
-  cangle_sliced <- xr$DataArray(
-    data = interp_angles,
-    dims = list("lat"),
-    coords = list(lat = u_array_aligned$lat)
-  )
-  
-  # =========================================================================
-  # 3. MASK GENERATION FOR LONGITUDINAL EXTENT
-  # =========================================================================
-  py_mask <- (mask_sliced$lat >= min_lat) & (mask_sliced$lat <= max_lat) & 
-    (mask_sliced >= filter_dict[[stage]][['min_iso']]) & 
-    (mask_sliced <= filter_dict[[stage]][['max_iso']]) & 
-    (!mask_sliced$isnull())
-  
-  # =========================================================================
-  # 4. VECTOR ROTATION & DYNAMIC THICKNESS CALCULATION
-  # =========================================================================
-  cat("Vector rotation and dynamic cell thickness calculation...\n")
-  
-  # 4a. Calculate alongshore and cross-shore wind stress
-  
-  ua_array <- (v_array_aligned * np$sin(cangle_sliced)) - (u_array_aligned * np$cos(cangle_sliced))
-  uc_array <- (v_array_aligned * np$cos(cangle_sliced)) + (u_array_aligned * np$sin(cangle_sliced))
-  
-  # 4b. calculate depth profiles
-  
-  if ("z_l" %in% names(u_dataset)) {
-    zl_vals <- py_to_r(u_dataset[["z_l"]]$values)
-    nz <- length(zl_vals)
-    zi_vals <- numeric(nz + 1)
-    zi_vals[1] <- 0
-    for (k in 1:nz) {
-      zi_vals[k+1] <- 2 * zl_vals[k] - zi_vals[k]
-    }
-    dz_vals <- abs(diff(zi_vals))
-    
-    dz_full <- xr$DataArray(
-      data = dz_vals,
-      dims = list(depth_name),
-      coords = setNames(list(u_dataset[[depth_name]]), depth_name)
-    )
-  }
-  
-  depth_selector <- unname(list(u_array_aligned[[depth_name]])) |> setNames(depth_name)
-  dz_sliced <- dz_full$sel(depth_selector)
-  
-  ua_masked <- ua_array$where(py_mask)
-  uc_masked <- uc_array$where(py_mask)
-  dz_masked <- dz_sliced$where(py_mask) #the values in this are the depth bins
-  
-  # =========================================================================
-  # 5. THICKNESS-INTEGRATED TRANSPORT & SPATIAL MEAN
-  # =========================================================================
-  cat("Collapsing water column via high-performance thickness weighting...\n")
-  # 5a. integrating across depth (Interpolate to z_int in Mike's code)
-  ua_integrated <- ua_masked * dz_masked
-  uc_integrated <- uc_masked * dz_masked
-  
-  # 5b. calculating the mean of the vertical profile
-  ua_weighted_vertical_mean <- ua_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
-  uc_weighted_vertical_mean <- uc_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
-  
-  # 5C. calculating means across space 
-  
-  horizontal_dims <- py_to_r(py$list(ua_weighted_vertical_mean$dims))
-  spatial_dims_to_drop <- horizontal_dims[horizontal_dims != "time"]
-  cat("Aggregating means across space ...\n")
-  ua_series <- ua_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
-  uc_series <- uc_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
-  
-  # =========================================================================
-  # 6. PARSING DATA INTO R DATA FRAMES
-  # =========================================================================
-  cat("Extracting values free of memory overhead...\n")
-  raw_ua <- py_to_r(ua_series$values)
-  raw_uc <- py_to_r(uc_series$values)
-  
-  # this data frame has monthly means
-  temp_df <- data.frame(
-    year = r_years,
-    u_along = raw_ua,
-    u_cross = raw_uc
-  )
-  
-  # =========================================================================    
-  # 7. MONTHLY MEANS AND TEMPORAL LAGS
-  # =========================================================================
-    cat("Aggregating annual timeline numbers in R...\n")
-  # 7a. aggregating across months to take a monthly mean
-    ds_df_along <- aggregate(u_along ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
-    ds_df_cross <- aggregate(u_cross ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
-# 7b. combining u and v in one dataframe to export
-    ds_df <- merge(ds_df_along, ds_df_cross, by = "year")
-# 7c. if preconditioning is specified, applying a lag
-    if (precond) {
-      cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-      ds_df$year <- ds_df$year + 1
-    }
-
-    rownames(ds_df) <- ds_df$year
-    ds_df$year <- NULL
-
-    # 7d. Dynamically rename the columns based on the current active 'stage' string
-    ast_name <- paste0("AST_", stage)
-    cst_name <- paste0("CST_", stage)
-    colnames(ds_df) <- c(ast_name, cst_name)
-
-    rm(temp_df, raw_ua, raw_uc, r_years)
-    gc()
-
-    end_time <- Sys.time()
-    runtime_minutes <- as.numeric(difftime(end_time, start_time, units = "mins"))
-    cat(paste0("Runtime: ", round(runtime_minutes, 2), " minutes\n"))
-
-    return(ds_df)
-
-}
-
-
-
-ASTlatelarv = surface_eke_3d(ds_xv,ds_yv, ds_depth, lifestage_dict, 'latelarv',precond=FALSE, TRUE)
-
-```
-
-
-```{r echo=FALSE}
-
-surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_dict, stage, precond, print_counts = TRUE) {
-  start_time <- Sys.time()
-  cat("--- Calculating Surface EKE 0-5m (Velocity Anomalies) ---\n")
-  
-  # Fetch native Python built-ins
-  py <- import_builtins()
-  np <- import("numpy")
-  
-  # =========================================================================
-  # 1. INITIAL TEMPORAL & LATITUDINAL SLICING UPFRONT
-  # =========================================================================
-  cat("Slicing spatial and temporal boundaries upfront...\n")
-  month_list <- seq(filter_dict[[stage]][["min_month"]], filter_dict[[stage]][["max_month"]])
-  min_lat <- as.numeric(filter_dict[[stage]][["min_lat"]])
-  max_lat <- as.numeric(filter_dict[[stage]][["max_lat"]])
-  
-  u_filtered <- u_dataset[["uo_rotate"]]$sel(
-    time = u_dataset$time$dt$month$isin(month_list),
-    lat = py$slice(min_lat, max_lat)
-  )
-  v_filtered <- v_dataset[["vo_rotate"]]$sel(
-    time = v_dataset$time$dt$month$isin(month_list),
-    lat = py$slice(min_lat - 0.5, max_lat + 0.5)
-  )
-  
-  r_years <- py_to_r(u_filtered$time$dt$year$values)
-  r_months <- py_to_r(u_filtered$time$dt$month$values)
-  
-  # =========================================================================
-  # 2. DYNAMIC SHALLOWEST LAYER SELECTION
-  # =========================================================================
-  depth_name <- NULL
-  available_dims <- py_to_r(py$list(u_filtered$dims))
-  for (d in c("depth", "lev", "plev", "vertical", "z_l")) {
-    if (d %in% available_dims) { depth_name <- d; break }
-  }
-  
-  if (!is.null(depth_name)) {
-    nz <- length(py_to_r(u_filtered[[depth_name]]$values))
-    u_surface <- u_filtered$isel(setNames(list(0L), depth_name))
-    v_surface <- v_filtered$isel(setNames(list(0L), depth_name))
-    if (nz > 1) {
-      for (k in 2:nz) {
-        layer_idx <- k - 1L
-        u_surface <- u_surface$combine_first(u_filtered$isel(setNames(list(layer_idx), depth_name)))
-        v_surface <- v_surface$combine_first(v_filtered$isel(setNames(list(layer_idx), depth_name)))
-      }
-    }
-  } else {
-    u_surface <- u_filtered; v_surface <- v_filtered
-  }
-  
-  # =========================================================================
-  # 3. ALIGN STAGGERED VELOCITY GRIDS LAZILY
-  # =========================================================================
-  cat("Aligning staggered velocity grids lazily...\n")
-  v_array_aligned <- v_surface$interp_like(u_surface, method = "nearest")
-  if (as.logical(v_array_aligned$isnull()$all()$values)) {
-    v_array_aligned <- u_surface$copy(data = v_surface$values, deep = TRUE)
-  }
-  
- #=========================================================================
-  # 4. BROADCAST 1D DISTANCE METRIC ACROSS THE 2D LONGITUDE MESH (SEPARATE U & V MASKS)
-  # =========================================================================
-  if (!is.null(mask_type) && mask_type == "distance") {
-    # Generate U-grid mask
-    mask_sliced_u <- long_dataset[["dist"]]$interp_like(u_surface, method = "nearest")
-    py_mask_u <- (mask_sliced_u$lat >= min_lat) & (mask_sliced_u$lat <= max_lat) &
-      (mask_sliced_u >= filter_dict[[stage]][['min_dist']]) &
-      (mask_sliced_u <= filter_dict[[stage]][['max_dist']]) &
-      (mask_sliced_u$notnull())
-    
-    # Generate V-grid mask
-    mask_sliced_v <- long_dataset[["dist"]]$interp_like(v_array_aligned, method = "nearest")
-    py_mask_v <- (mask_sliced_v$lat >= min_lat) & (mask_sliced_v$lat <= max_lat) &
-      (mask_sliced_v >= filter_dict[[stage]][['min_dist']]) &
-      (mask_sliced_v <= filter_dict[[stage]][['max_dist']]) &
-      (mask_sliced_v$notnull())
-    
-  } else if (!is.null(mask_type) && mask_type == "isobath") {
-    # Generate U-grid mask
-    mask_sliced_u <- long_dataset[["deptho"]]$interp_like(u_surface, method = "nearest")
-    py_mask_u <- (mask_sliced_u$lat >= min_lat) & (mask_sliced_u$lat <= max_lat) &
-      (mask_sliced_u >= filter_dict[[stage]][['min_iso']]) &
-      (mask_sliced_u <= filter_dict[[stage]][['max_iso']]) &
-      (mask_sliced_u$notnull())
-    
-    # Generate V-grid mask
-    mask_sliced_v <- long_dataset[["deptho"]]$interp_like(v_array_aligned, method = "nearest")
-    py_mask_v <- (mask_sliced_v$lat >= min_lat) & (mask_sliced_v$lat <= max_lat) &
-      (mask_sliced_v >= filter_dict[[stage]][['min_iso']]) &
-      (mask_sliced_v <= filter_dict[[stage]][['max_iso']]) &
-      (mask_sliced_v$notnull())
-    
-  } else {
-    # Default Longitude/Latitude bounds check
-    py_mask_u <- (u_surface$lat >= min_lat) & (u_surface$lat <= max_lat) &
-      (u_surface$lon >= filter_dict[[stage]][['min_long']]) &
-      (u_surface$lon <= filter_dict[[stage]][['max_long']])
-    
-    py_mask_v <- (v_array_aligned$lat >= min_lat) & (v_array_aligned$lat <= max_lat) &
-      (v_array_aligned$lon >= filter_dict[[stage]][['min_long']]) &
-      (v_array_aligned$lon <= filter_dict[[stage]][['max_long']])
-  }
-  
-   # Apply distinct masks completely lazily
-  u_masked <- u_surface$where(py_mask_u)
-  v_masked <- v_array_aligned$where(py_mask_v)
-
-  # =========================================================================
-  # 5. CALCULATE SPATIAL ANOMALIES IN XARRAY (FULLY LAZY)
-  # =========================================================================
-  cat("Calculating monthly velocity anomalies across the spatial mesh inside Xarray...\n")
-  
-  # Group by month to calculate the climatological mean for each grid point
-  u_climatology <- u_masked$groupby("time.month")$mean("time", skipna = TRUE)
-  v_climatology <- v_masked$groupby("time.month")$mean("time", skipna = TRUE)
-  
-  # Subtract the monthly climatology from the original masked datasets to get anomalies
-  u_anom_spatial <- u_masked$groupby("time.month") - u_climatology
-  v_anom_spatial <- v_masked$groupby("time.month") - v_climatology
-  
-  # Calculate EKE on the full 3D spatial grid (0.5 * (u'^2 + v'^2))
-  eke_spatial <- 0.5 * (u_anom_spatial^2 + v_anom_spatial^2)
-
-  # =========================================================================
-  # 6. SPATIAL COLLAPSE WITH ZERO-COUNT SAFEGUARDS & MEMORY LOAD
-  # =========================================================================
-  cat("Collapsing horizontal spatial dimensions upfront to protect RAM...\n")
-  all_remaining_dims <- py_to_r(py$list(eke_spatial$dims))
-  spatial_dims_to_drop <- all_remaining_dims[all_remaining_dims != "time"]
-  
-  # Average EKE across space for each time step
-  eke_sum <- eke_spatial$sum(dim = spatial_dims_to_drop, skipna = TRUE)
-  eke_count <- eke_spatial$notnull()$sum(dim = spatial_dims_to_drop)
-  eke_time_series_lazy <- eke_sum$where(eke_count > 0, np$nan) / eke_count$where(eke_count > 0, 1.0)
-  
-  cat("Loading collapsed 1D EKE time series vector into R memory...\n")
-  # This is the single trigger point where Python executes the graph and loads the data
-  raw_values <- as.numeric(py_to_r(eke_time_series_lazy$compute()$values))
-  
-  valid_count <- sum(!is.na(raw_values))
-  cat(paste0(">>> Diagnostic: Out of ", length(raw_values), " time steps, ", valid_count, " contain valid numbers <<<\n"))
-  
-  if (valid_count == 0) {
-    stop("All calculated EKE values are NaN! The spatial mesh grid masks did not find intersecting water elements.")
-  }
-  
-  temp_df <- data.frame(year = r_years, value = raw_values)
-  
- # =========================================================================
-  # 7. AGGREGATE ANNUAL TIME SERIES
-  # =========================================================================
-  cat("Aggregating annual time series in R...\n")
-  ds_df <- aggregate(value ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
-  
-  if (precond) {
-    cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-    ds_df$year <- ds_df$year + 1
-  }
-  
-  rownames(ds_df) <- as.character(ds_df$year)
-  ds_df$year <- NULL
-  names(ds_df) <- "EKE_surface"
-  
-  # Clean up only the variables used in the new Xarray workflow
-  rm(temp_df, raw_values, r_years, r_months)
-  gc()
-  
-  end_time <- Sys.time()
-  cat(paste0("Calculation complete! Total execution time: ", round(difftime(end_time, start_time, units="secs"), 2), " seconds.\n"))
-  return(ds_df)
-}
-
-
-EKEJAc = surface_eke(ds_xv,ds_yv,ds_dist, "distance", lifestage_dict, 'JAc',precond=FALSE, TRUE)
 
 ```

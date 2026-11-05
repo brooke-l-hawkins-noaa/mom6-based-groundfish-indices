@@ -66,7 +66,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   var_array <- var_selected[[ds_var_name]]
   
   # Slice our reconstructed 1D layer thicknesses to match the current depth window footprint
-  dz_sliced <- dz_full$sel(setNames(list(py$slice(min_depth, max_depth)), depth_name))
+  # dz_sliced <- dz_full$sel(setNames(list(py$slice(min_depth, max_depth)), depth_name))
   
   # 4. We need the sliced Earthmover data to be able to be aligned with our masks
   # this will just dynamically rename "latitude" and "longitude" to "lat" "long" in the static datasets
@@ -79,7 +79,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   rename_list <- list()
   if ("latitude" %in% dim_keys) rename_list$latitude <- "lat"
   if ("longitude" %in% dim_keys) rename_list$longitude <- "lon"
-  if (!is.null(depth_name) && "deptho" %in% dim_keys) rename_list$deptho <- depth_name
+  #if (!is.null(depth_name) && "deptho" %in% dim_keys) rename_list$deptho <- depth_name
   
   if (length(rename_list) > 0) {
     long_dataset <- long_dataset$rename(rename_list)
@@ -102,7 +102,6 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   # shore, if it is "longitude" it is by min/max longitude. This is the default if you
   # do not provide anything
   
-  # 5. Use Xarray's interp_like to ensure alignment 
   cat("Interpolating mask grid onto variable layout...\n") 
   
   if (!is.null(mask_type) && mask_type == "distance") { 
@@ -132,7 +131,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   
   # Mask out layer thickness values where the variable data is null (handles seafloor truncation)
   # FIXED: Replaced R logic NOT operator (!) with native Python xarray $notnull() function
-  dz_masked <- dz_sliced$where(var_masked$notnull())
+  # dz_masked <- dz_sliced$where(var_masked$notnull())
   
   # This is just a check: Identify remaining spatial dimensions to summarise means over
   # (Modified to handle a two-stage spatial collapse incorporating vertical weights)
@@ -144,10 +143,10 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   
   # Step 7a: Calculate the vertical depth-weighted average: sum(var * dz) / sum(dz)
   # This collapses the "z_l" dimension first, turning the data into a 2D spatial plane (time, lat, lon)
-  var_weighted_sum <- (var_masked * dz_masked)$sum(dim = depth_name, skipna = TRUE)
-  dz_sum           <- dz_masked$sum(dim = depth_name, skipna = TRUE)
-  var_depth_mean   <- var_weighted_sum / dz_sum
-  
+  # var_weighted_sum <- (var_masked * dz_masked)$sum(dim = depth_name, skipna = TRUE)
+  # dz_sum           <- dz_masked$sum(dim = depth_name, skipna = TRUE)
+  # var_depth_mean   <- var_weighted_sum / dz_sum
+  var_depth_mean   <-  var_masked
   # Step 7b: Identify remaining horizontal spatial dimensions to drop (should be "lat" and "lon")
   all_remaining_dims <- py_to_r(py$list(var_depth_mean$dims))
   spatial_dims_to_drop <- all_remaining_dims[all_remaining_dims != "time"]
@@ -174,15 +173,14 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   # If preconditioning is TRUE, add a 1-year lag to the timeline data index
   if (precond) {
     cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-    # In a default pandas to_dataframe() conversion with groupby('time.year'),
-    # the years are stored as the index (rownames) of the R data frame.
-    current_years <- as.numeric(rownames(ds_df))
+     current_years <- as.numeric(ds_df$year)
     lagged_years <- current_years + 1
     rownames(ds_df) <- as.character(lagged_years)
+    ds_df$year<-rownames(ds_df)
   }
   
   # Format column and index headers
-  rownames(ds_df) <- ds_df$year
+  #rownames(ds_df) <- ds_df$year
   ds_df$year <- NULL
   names(ds_df) <- df_var_name
   
