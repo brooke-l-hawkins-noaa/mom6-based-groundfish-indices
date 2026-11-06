@@ -268,20 +268,19 @@ temp_df <- updated_list %>%
   mutate(year=as.numeric(year))#%>%
   #left_join(transport_df)
 
-#write.csv(temp_df2, "Output/YellowtailMOM6_depthweighted.csv")
 ```
 
 
 
 ```{r echo=FALSE}
 
-CSTlarv = annual_mean_3d_depthweighted(ds_xv, ds_depth, "isobath","uo_rotate", "CSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
+CSTlarv = annual_mean_3d(ds_xv, ds_depth, "isobath","uo_rotate", "CSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
 
-CSTpjuv = annual_mean_3d_depthweighted(ds_xv, ds_depth, "isobath","uo_rotate", "CSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
+CSTpjuv = annual_mean_3d(ds_xv, ds_depth, "isobath","uo_rotate", "CSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
 
-LSTlarv = annual_mean_3d_depthweighted(ds_yv, ds_depth, "isobath","vo_rotate", "LSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
+LSTlarv = annual_mean_3d(ds_yv, ds_depth, "isobath","vo_rotate", "LSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
 
-LSTpjuv = annual_mean_3d_depthweighted(ds_yv, ds_depth, "isobath","vo_rotate", "LSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
+LSTpjuv = annual_mean_3d(ds_yv, ds_depth, "isobath","vo_rotate", "LSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
 
  threed.ls <- list(LSTpjuv,LSTlarv,CSTlarv,CSTpjuv)
 updated_list <- map(threed.ls, ~ tibble::rownames_to_column(.x, var = "year"))
@@ -290,5 +289,6 @@ temp_df2 <- updated_list %>%
   reduce(left_join, by = "year")%>%
   mutate(year=as.numeric(year))%>%
   left_join(temp_df)
+write.csv(temp_df2, "Output/YellowtailMOM6_velocity3d.csv")
 
 ```
