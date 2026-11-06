@@ -317,28 +317,9 @@ lifestage_dict <- list(
     max_depth = 50,
     min_iso = 0,
     max_iso=200
-  ), 
-  Tcop = list( # age0
-    min_month = 1,
-    max_month = 4,
-    min_lat   = 40,
-    max_lat   = 48,
-    min_depth = 90,
-    max_depth = 180,
-    min_iso = 1,
-    max_iso=1200
-  ), 
-  Tpart = list( # age0
-    min_month = 8,
-    max_month = 10,
-    min_lat   = 40,
-    max_lat   = 48,
-    min_depth = 0,
-    max_depth = 180,
-    min_iso = 1,
-    max_iso=1200
+  )
 )
-)
+
 ```
 
 ```{r echo=FALSE}
@@ -438,33 +419,18 @@ Now lets do the 3-d variables
 
 ```{r echo=FALSE}
 
-var_dataset=ds_temp
-long_dataset=ds_depth
-mask_type="isobath"
-ds_var_name="thetao"
-df_var_name="TEMPpre"
-filter_dict=lifestage_dict
-stage='prec'
-precond=TRUE 
-print_counts = TRUE
+TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',TRUE,TRUE)
 
-TEMPpre = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPpre", lifestage_dict, 'prec',precond=TRUE,TRUE)
+TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',FALSE,TRUE)
 
-TEMPspawn = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "TEMPspawn", lifestage_dict, 'spawn',precond=TRUE,TRUE)
-
-TEMPcop = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tcop", lifestage_dict, 'Tcop',precond=TRUE,TRUE)
-
-TEMPpart = annual_mean_3d(ds_temp, ds_depth, "isobath","thetao", "Tpart", lifestage_dict, 'Tpart',precond=FALSE,TRUE)
-
-twod.ls <- list(TEMPspawn,TEMPpre,TEMPcop,TEMPpart)
-updated_list <- map(twod.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+threed.ls <- list(TEMPspawn,TEMPpre) 
+updated_list <- map(threed.ls, ~ tibble::rownames_to_column(.x, var = "year"))
 
 transport_df <- updated_list %>% 
   reduce(left_join, by = "year")%>%
   mutate(model="MOM6", year=as.numeric(year))
 
 ```
-
 
 ```{r echo=FALSE}
 library(ncdf4)
@@ -509,56 +475,58 @@ transport_df <- updated_list %>%
   reduce(left_join, by = "year")%>%
   mutate(model="MOM6", year=as.numeric(year))
 
-u_dataset =ds_xv
-v_dataset= ds_yv
-long_dataset=ds_depth
-coast_ds=nc_data
-filter_dict=lifestage_dict
-stage='egg.n'
-precond=FALSE
-print_counts=TRUE
+
+```
+```{r echo=FALSE}
+
+devtools::load_all(here::here())
+
+EKEja.s  = surface_eke(ds_xv,ds_yv, ds_dist, "distance", lifestage_dict, 'ja.s',precond=FALSE,TRUE)
+
+EKEja.c  = surface_eke(ds_xv,ds_yv, ds_dist, "distance", lifestage_dict, 'ja.c',precond=FALSE,TRUE)
+
+EKEms.s  = surface_eke(ds_xv,ds_yv, ds_dist, "distance", lifestage_dict, 'ms.s',precond=FALSE,TRUE)
+
+EKEms.c  = surface_eke(ds_xv,ds_yv, ds_dist, "distance", lifestage_dict, 'ms.c',precond=FALSE,TRUE)
+
+EKE.ls <- list(EKEja.s,EKEja.c,EKEms.s,EKEms.c)
+EKE_list <- map(EKE.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- EKE_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
 
 
 ```
+
 ROMS comparison
+
 ```{r echo=FALSE}
-new_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.2011.2021.csv")
-old_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.1980.2010.csv")
-roms<-new_roms%>%bind_rows(old_roms)%>%
+new_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.2011.2021.csv")%>%
   mutate(model="ROMS")
+old_roms<-read.csv("Data_ROMS.for.hake.analysis.mean.1980.2010.csv")%>%
+  mutate(model="ROMS")
+roms<-new_roms%>%bind_rows(old_roms)
 
-mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
-  mutate(model="MOM6v2")%>%select(year,Tcop,Tpart,model)
-
-glorys<-read.csv("2024Env-annual-yellowtail_GLORYS_UNSTANDARDIZED.csv")%>%
-  mutate(model="glorys")
-
- roms_long<-glorys%>%pivot_longer(
+ roms_long<-old_roms%>%pivot_longer(
     cols =-c(year, model),       
     names_to = "variable", 
     values_to = "values"  
-  )%>%filter(year>=1994&year<=2023)
+  )%>%filter(year>=1994&year<=2010)
  
- 
-mom6_long_alt<-mom6alt%>%pivot_longer(
-    cols =-c(year, model),       
-    names_to = "variable", 
-    values_to = "values"  
-  )%>%filter(year>=1994&year<=2023)
  
 mom6_long<-transport_df%>%
   mutate(model="MOM6")%>%pivot_longer(
     cols =-c(year, model),       
     names_to = "variable", 
     values_to = "values"  
-  )%>%filter(year>=1994&year<=2023)
+  )%>%filter(year>=1994&year<=2010)
 
 mom6_roms<-mom6_long%>%
   bind_rows(roms_long)%>%
-  bind_rows(mom6_long_alt)%>%
   filter(variable %in% intersect(unique(mom6_long$variable), unique(roms_long$variable)))
 
-mom6_roms_corr<-mom6_long%>%#select(-model)%>%
+mom6_roms_corr<-mom6_long%>%select(-model)%>%
   rename(mom6_values=values)%>%
   inner_join(roms_long)%>%#select(-model))%>%
   group_by(variable,model)%>%
@@ -569,8 +537,7 @@ mom6_roms_corr<-mom6_long%>%#select(-model)%>%
    )%>%
    mutate(corr=round(correlation, 3))
  
-  cor(mom6_roms_corr$standardized_mom6, mom6_roms_corr$standardized_roms)
-  
+
 unstandardized<-ggplot(data=mom6_roms, aes(x=year, y=values,col=model))+
   geom_line()+
   facet_wrap(~variable, scales = "free_y")+
@@ -579,16 +546,15 @@ unstandardized<-ggplot(data=mom6_roms, aes(x=year, y=values,col=model))+
 
 mom6_roms_stand<-mom6_roms%>%
   group_by(model, variable)%>%
-  group_by(model)%>%
   mutate(standardized_values= scale(values))%>%
-  ungroup()#%>%
- # left_join(data.frame(mom6_roms_corr))
+  ungroup()%>%
+  left_join(data.frame(mom6_roms_corr))
 
-standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model))+
+standardized <- ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model))+
   geom_line()+
-  facet_wrap(~variable)+
+  facet_wrap(~variable, scales='free_y')+
   ggtitle("Standardized")+
-  #geom_text(aes(x = 1995, y = 2, label =corr) ) +
+  geom_text(aes(x = 2000, y = 2, label =corr) ) +
   theme_classic()
 
 

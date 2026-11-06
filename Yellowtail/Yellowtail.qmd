@@ -1,0 +1,389 @@
+---
+title: "YellowtailComparison"
+format: pdf
+editor: visual
+---
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+# Check current working directory
+devtools::load_all(here::here())
+library(dplyr)
+library(ncdf4)
+library(tidyr)
+library(corrplot)
+library(rerddap)
+library(ggplot2)
+library(rerddap)
+library(ggplot2)
+library(lubridate)
+library(rerddap)
+library(purrr)
+library(stringr)
+library(reticulate)
+```
+
+To validate how well components of our functions are working, we revisit the MOM6 data developed by Brooke and Roland. There are two relevant functions here, annual_mean_2d and annual_mean_3d. There was a minor bug identified in the implementation of the MOM6 post processing depth filters. Specifically, the depth bins were used to filter the longitudinal extent rather than the dpeths. Given the depths and the extent of the isobath this should impact the correlations between this workflow and the previous workflow to a minor extent.
+
+First, we replicate the previous workflow exactly to identify differences in how these functions were generated, then we compare using the correct isobath/depth filtering and produce a second comparison.
+
+In this first comparison the 2d variables (here are mixed layer depth) tell us whehter the 1) latitudinal and month slices, and 2) isobath masks are applied correctly in our function. This application is the same across the four key fucntions for 3d, transport and EKE.
+
+The 3d variables (here temperature) tell us whether the 1) depth slicing, and 2) preconditioning conditions are applied correctly.
+
+```{r echo=FALSE, warning=FALSE}
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")
+mom6<-read.csv("Output/YellowtailMOM6_COMPARISON.csv")
+glorys<-read.csv("yellowtail_GLORYs.csv")%>%
+  mutate(model="GLORYS")
+
+mom6alt_long<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+glorys_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+
+mom6_long<-mom6%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6alt_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_roms= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_roms),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+mom6_alt<-mom6_alt%>%
+  left_join(data.frame(mom6_alt_corr))
+unstandardized<-ggplot(data=mom6_alt%>%filter(model!='GLORYS'), aes(x=year, y=values,col=model, label=corr))+
+  geom_line()+
+  geom_text(aes(x = 2010, y = 14, label =corr) )+
+  facet_wrap(~variable)+ #, scales = "free_y"
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+
+mom6_roms_stand<-mom6_alt%>%
+  group_by(model, variable)%>%
+  group_by(model)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()%>%
+  left_join(data.frame(mom6_alt_corr))
+  
+  standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable)+
+  ggtitle("Standardized")+
+  geom_text(aes(x = 2010, y = 2, label =corr) )+
+  theme_classic()
+   standardized
+```
+
+We find that the unstandardized values for the two identical post processing procedures are nearly identical all with a correlation of \> 0.98. This confirms that the applications of slicing, preconditioning, and isobath masking are all perfomring correctly. Minor differences can be attributed to differences in the hindcast version (accessed in summer 2025 versus autumn 2026). Overall, we can be confident that the functions are operating correctly. (@fig-unstand)
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-unstand
+#| fig-cap: "Unstandardized mixed layer depth adn temperature for northern yellowtail rockfish. MOM6 refers to this workflow and MOMv2 refers to the previous workflow in python. Values refer to the correlation coeffcients between the two post processing workflows."
+#| 
+unstandardized
+```
+
+Now we can look at the correct isobath/depth implementation and see how much that changes our results. This change simply applies different isobath bounds in the life history look up table.
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")
+mom6<-read.csv("Output/YellowtailMOM6.csv")
+glorys<-read.csv("yellowtail_GLORYs.csv")%>%
+  mutate(model="GLORYS")
+
+mom6alt_long<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+glorys_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+
+mom6_long<-mom6%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6alt_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_mom6alt= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_mom6alt),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+
+unstandardizedv2<-ggplot(data=mom6_alt%>%filter(model!='GLORYS'), aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+
+mom6_roms_stand<-mom6_alt%>%
+  group_by(model, variable)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()%>%
+  left_join(data.frame(mom6_alt_corr))
+  
+  standardizedv2<-ggplot(data=mom6_roms_stand%>%filter(model!='GLORYS'), aes(x=year, y=standardized_values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Standardized")+
+  geom_text(aes(x = 2010, y = 2, label =corr) )+
+  theme_classic()
+   standardizedv2
+```
+
+It is clear that executing the proper isobath causes some bias but this is to be expected as the MOM6 workflow has a deeper isobath than MOM6 v2. (@fig-unstand2)
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-unstand2
+#| fig-cap: "Unstandardized mixed layer depth adn temperature for northern yellowtail rockfish. MOM6 refers to this workflow with isobath/depth bug corrected and MOMv2 refers to the previous workflow in python. Values refer to the correlation coeffcients between the two post processing workflows."
+#| 
+unstandardizedv2
+```
+
+It is clear that executing the proper isobath causes some bias but this is to be expected ast MOM6 workflow has a deeper isobath than MOM6 v2. Once we stardadize the data, we see they are still highly correlated (\> 0.7) (@fig-stand)
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-stand
+#| fig-cap: "Standardized mixed layer depth adn temperature for northern yellowtail rockfish. MOM6 refers to this workflow with isobath/depth bug corrected and MOMv2 refers to the previous workflow in python. Values refer to the correlation coeffcients between the two post processing workflows."
+#| 
+ standardizedv2
+```
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(glorys_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_glorys= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_glorys),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+mom6_roms_stand<-mom6_alt%>%
+  group_by(model, variable)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()%>%
+  left_join(data.frame(mom6_alt_corr))
+  
+  standardizedv2<-ggplot(data=mom6_roms_stand%>%filter(model!='MOM6v2'), aes(x=year, y=standardized_values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Standardized")+
+  geom_text(aes(x = 2010, y = 2, label =corr) )+
+  theme_classic()
+
+```
+
+If we compare this workflow to GLORYS that was processed the same way we find all variables are moderately to highly correlated. Although it is surprising Tcop does not have a higher correlation (@fig-stand2).
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-stand2
+#| fig-cap: "Standardized mixed layer depth and temperature for northern yellowtail rockfish. MOM6 refers to this workflow with isobath/depth bug corrected and GLORYS refers to the GLORYS model with the same post processing. Values refer to the correlation coeffcients between the two post processing workflows."
+
+ standardizedv2
+```
+
+Finally, we implemented an improvement to how 3-d variables are integrated at depth that accounts for variable thickness in depth bins. This is beneficial because aggregated means will be bias towards the surface is depth is not considered. This will be a gut check as to whether the depth weighting has any errors introducing something unexpected. Introducing the depth weighted mean is nearly identical this means that its introduction is implmented correctly and its introduction is not a major modification to the workflow that should disrupt the relationships between variables (@fig-unstandD)
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+
+mom6d<-read.csv("Output/YellowtailMOM6_depthweighted.csv")%>%
+  mutate(model="MOM6depth")
+
+mom6d_long<-mom6d%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  bind_rows(mom6d_long)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6d_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_mom6d= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_mom6d),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+unstandardizedv3<-ggplot(data=mom6_alt%>%filter(model!='GLORYS'&model!='MOM6v2')%>%filter(variable=="Tcop"|variable=="Tpart")%>%
+  left_join(data.frame(mom6_alt_corr)), aes(x=year, y=values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  geom_text(aes(x = 2010, y = 9, label =corr) )+
+  theme_classic()
+
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-unstandD
+#| fig-cap: "Untandardized  temperature for northern yellowtail rockfish. MOM6 refers to this workflow with isobath/depth bug corrected but no depth weighted mean, and MOM6depth refers to the same workflow with only the depth weighted mean introduced."
+
+unstandardizedv3
+```
+Comparing seawater velocity between MOM6 and GLORYs, we find that there are correlations of 0.3 - 0.5 although there is a bias (@fig-unstandF). This indicates that we can expect correlation with approximately similar correlation with the transport variables if the calculations are consistent. 
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+
+mom6d<-read.csv("Output/YellowtailMOM6_depthweighted.csv")%>%
+  mutate(model="MOM6depth")
+
+mom6d_long<-mom6d%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  bind_rows(mom6d_long)%>%
+  filter(variable %in% intersect(unique(mom6d_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-glorys_long%>%select(-model)%>%filter(year>=1993&year<=2022)%>%
+  rename(glorys_values=values)%>%
+  inner_join(mom6d_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_glorys= scale(glorys_values),standardized_mom6d= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_glorys, standardized_mom6d),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+unstandardizedv4<-ggplot(data=mom6_alt%>%filter(variable!="Tcop"&variable!="Tpart")%>%filter(model!='MOM6v2'&model!='MOM6')%>%
+  left_join(data.frame(mom6_alt_corr)), aes(x=year, y=values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  geom_text(aes(x = 2010, y = 0.01, label =corr) )+
+  theme_classic()
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-unstandF
+#| fig-cap: "Untandardized  temperature for northern yellowtail rockfish.  MOM6depth refers to the same workflow with only the depth weighted mean introduced and the isobath / depth bug corrected."
+
+unstandardizedv4
+```
+
+Looking at the two MOM6 versions that have depth and isobath slightly different, we see that this has a more drastic impact on correlation than different ocean models that were calculated the same way @fig-unstandE. This leads me to think some of the poor performing aspects of transport is still related to a moderately different calculations somewhere which may include how distance is projected, or the depth integration.
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+
+mom6_alt_corr<-mom6alt_long%>%select(-model)%>%filter(year>=1993&year<=2022)%>%
+  rename(mom6alt_values=values)%>%
+  inner_join(mom6d_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_alt= scale(mom6alt_values),standardized_mom6d= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_alt, standardized_mom6d),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+
+unstandardizedv5<-ggplot(data=mom6_alt%>%filter(variable!="Tcop"&variable!="Tpart")%>%filter(model!='GLORYS')%>%
+  left_join(data.frame(mom6_alt_corr)), aes(x=year, y=values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  geom_text(aes(x = 2010, y = 0.01, label =corr) )+
+  theme_classic()
+
+unstandardizedv6<-ggplot(data=mom6_alt%>%filter(variable!="Tcop"&variable!="Tpart")%>%filter(model!='GLORYS'), aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  #geom_text(aes(x = 2010, y = 0.01, label =corr) )+
+  theme_classic()
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+#| label: fig-unstandE
+#| fig-cap: "Untandardized  temperature for northern yellowtail rockfish.  MOM6depth refers to the same workflow with only the depth weighted mean introduced and the isobath / depth bug corrected whereas MOM6v2 is the same model but with different isobath bounds."
+
+unstandardizedv5
+```
+
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%filter(year>=1993&year<=2022)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6d_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized= scale(mom6_values),standardized_mom6d= scale(values))%>%
+   summarise(
+     correlation = cor(standardized, standardized_mom6d),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+
+unstandardizedv5<-ggplot(data=mom6_alt%>%filter(variable!="Tcop"&variable!="Tpart")%>%filter(model!='GLORYS')%>%
+  left_join(data.frame(mom6_alt_corr)), aes(x=year, y=values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  geom_text(aes(x = 2010, y = 0.01, label =corr) )+
+  theme_classic()
+
+
+```

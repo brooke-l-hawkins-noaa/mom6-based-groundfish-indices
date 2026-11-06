@@ -23,45 +23,25 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
   )
   v_filtered <- v_dataset[["vo_rotate"]]$sel(
     time = v_dataset$time$dt$month$isin(month_list),
-    lat = py$slice(min_lat - 0.5, max_lat + 0.5)
+    lat = py$slice(min_lat, max_lat)
   )
   
   r_years <- py_to_r(u_filtered$time$dt$year$values)
   r_months <- py_to_r(u_filtered$time$dt$month$values)
   
   # =========================================================================
-  # 2. DYNAMIC SHALLOWEST LAYER SELECTION
+  # 2.SHALLOWEST LAYER SELECTION
   # =========================================================================
-  depth_name <- NULL
-  available_dims <- py_to_r(py$list(u_filtered$dims))
-  for (d in c("depth", "lev", "plev", "vertical", "z_l")) {
-    if (d %in% available_dims) { depth_name <- d; break }
-  }
+  # 1. Create the named list tracking your depth parameter axis
+  target_depth_slice <- unname(list(c(2.5))) |> setNames(depth_name)
   
-  if (!is.null(depth_name)) {
-    nz <- length(py_to_r(u_filtered[[depth_name]]$values))
-    u_surface <- u_filtered$isel(setNames(list(0L), depth_name))
-    v_surface <- v_filtered$isel(setNames(list(0L), depth_name))
-    if (nz > 1) {
-      for (k in 2:nz) {
-        layer_idx <- k - 1L
-        u_surface <- u_surface$combine_first(u_filtered$isel(setNames(list(layer_idx), depth_name)))
-        v_surface <- v_surface$combine_first(v_filtered$isel(setNames(list(layer_idx), depth_name)))
-      }
-    }
-  } else {
-    u_surface <- u_filtered; v_surface <- v_filtered
-  }
+  # 2. Convert to a native Python dictionary using reticulate's dict engine
+  py_dict_slice <- reticulate::dict(target_depth_slice)
   
-  # =========================================================================
-  # 3. ALIGN STAGGERED VELOCITY GRIDS LAZILY
-  # =========================================================================
-  cat("Aligning staggered velocity grids lazily...\n")
-  v_array_aligned <- v_surface$interp_like(u_surface, method = "nearest")
-  if (as.logical(v_array_aligned$isnull()$all()$values)) {
-    v_array_aligned <- u_surface$copy(data = v_surface$values, deep = TRUE)
-  }
-  
+  # 3. Apply the slice safely via xarray
+  u_surface <- u_filtered$sel(py_dict_slice, method = "nearest")
+  v_surface <- v_filtered$sel(py_dict_slice, method = "nearest")
+
   #=========================================================================
   # 4. BROADCAST 1D DISTANCE METRIC ACROSS THE 2D LONGITUDE MESH (SEPARATE U & V MASKS)
   # =========================================================================
@@ -74,7 +54,7 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
       (mask_sliced_u$notnull())
     
     # Generate V-grid mask
-    mask_sliced_v <- long_dataset[["dist"]]$interp_like(v_array_aligned, method = "nearest")
+    mask_sliced_v <- long_dataset[["dist"]]$interp_like(v_surface, method = "nearest")
     py_mask_v <- (mask_sliced_v$lat >= min_lat) & (mask_sliced_v$lat <= max_lat) &
       (mask_sliced_v >= filter_dict[[stage]][['min_dist']]) &
       (mask_sliced_v <= filter_dict[[stage]][['max_dist']]) &
@@ -89,7 +69,7 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
       (mask_sliced_u$notnull())
     
     # Generate V-grid mask
-    mask_sliced_v <- long_dataset[["deptho"]]$interp_like(v_array_aligned, method = "nearest")
+    mask_sliced_v <- long_dataset[["deptho"]]$interp_like(v_surface, method = "nearest")
     py_mask_v <- (mask_sliced_v$lat >= min_lat) & (mask_sliced_v$lat <= max_lat) &
       (mask_sliced_v >= filter_dict[[stage]][['min_iso']]) &
       (mask_sliced_v <= filter_dict[[stage]][['max_iso']]) &
@@ -101,14 +81,14 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
       (u_surface$lon >= filter_dict[[stage]][['min_long']]) &
       (u_surface$lon <= filter_dict[[stage]][['max_long']])
     
-    py_mask_v <- (v_array_aligned$lat >= min_lat) & (v_array_aligned$lat <= max_lat) &
-      (v_array_aligned$lon >= filter_dict[[stage]][['min_long']]) &
-      (v_array_aligned$lon <= filter_dict[[stage]][['max_long']])
+    py_mask_v <- (v_surface$lat >= min_lat) & (v_surface$lat <= max_lat) &
+      (v_surface$lon >= filter_dict[[stage]][['min_long']]) &
+      (v_surface$lon <= filter_dict[[stage]][['max_long']])
   }
   
   # Apply distinct masks completely lazily
   u_masked <- u_surface$where(py_mask_u)
-  v_masked <- v_array_aligned$where(py_mask_v)
+  v_masked <- v_surface$where(py_mask_v)
   
   # =========================================================================
   # 5. CALCULATE SPATIAL ANOMALIES IN XARRAY (FULLY LAZY)
@@ -127,21 +107,34 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
   eke_spatial <- 0.5 * (u_anom_spatial^2 + v_anom_spatial^2)
   
   # =========================================================================
-  # 6. SPATIAL COLLAPSE WITH ZERO-COUNT SAFEGUARDS & MEMORY LOAD
+  # 6. SPATIAL MEAN (WITH AREA WEIGHTING)
   # =========================================================================
-  cat("Collapsing horizontal spatial dimensions upfront to protect RAM...\n")
+  cat("Calculating area weights and collapsing spatial dimensions...\n")
+  
+  # 1. Grab the latitude coordinate from your Python object
+  # (Assumes your latitude dimension/coordinate is named "lat" or "latitude")
+  lat <- eke_spatial$lat 
+  
+  # 2. Compute weights: cos(lat in radians)
+  # np is assumed to be your imported numpy reference in R (e.g., np <- import("numpy"))
+  weights <- np$cos(np$deg2rad(lat))
+  
+  # 3. Apply weights to the EKE field where data is not null
+  # xarray handles broadcasting the 1D latitude weights across the 3D grid automatically
+  weighted_eke <- eke_spatial$weighted(weights)
+  
+  # 4. Determine spatial dimensions to collapse
   all_remaining_dims <- py_to_r(py$list(eke_spatial$dims))
   spatial_dims_to_drop <- all_remaining_dims[all_remaining_dims != "time"]
   
-  # Average EKE across space for each time step
-  eke_sum <- eke_spatial$sum(dim = spatial_dims_to_drop, skipna = TRUE)
-  eke_count <- eke_spatial$notnull()$sum(dim = spatial_dims_to_drop)
-  eke_time_series_lazy <- eke_sum$where(eke_count > 0, np$nan) / eke_count$where(eke_count > 0, 1.0)
+  # 5. Compute the weighted mean across the spatial dimensions
+  # xarray's weighted mean automatically accounts for NaNs/null masks in its denominator
+  eke_time_series_lazy <- weighted_eke$mean(dim = spatial_dims_to_drop, skipna = TRUE)
   
-  cat("Loading collapsed 1D EKE time series vector into R memory...\n")
-  # This is the single trigger point where Python executes the graph and loads the data
+  cat("Loading collapsed 1D weighted EKE time series vector into R memory...\n")
+  # This triggers the computation graph
   raw_values <- as.numeric(py_to_r(eke_time_series_lazy$compute()$values))
-  
+
   valid_count <- sum(!is.na(raw_values))
   cat(paste0(">>> Diagnostic: Out of ", length(raw_values), " time steps, ", valid_count, " contain valid numbers <<<\n"))
   
@@ -157,14 +150,22 @@ surface_eke <- function(u_dataset, v_dataset, long_dataset, mask_type, filter_di
   cat("Aggregating annual time series in R...\n")
   ds_df <- aggregate(value ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   
-  if (precond) {
+  # If preconditioning is TRUE, add a 1-year lag to the timeline data index
+  if (precond==TRUE) {
     cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-    ds_df$year <- ds_df$year + 1
+    # In a default pandas to_dataframe() conversion with groupby('time.year'),
+    # the years are stored as the index (rownames) of the R data frame.
+    current_years <- ds_df$year
+    lagged_years <- current_years + 1
+    ds_df$year <- lagged_years
   }
-  
-  rownames(ds_df) <- as.character(ds_df$year)
+  # Format column and index headers
+  rownames(ds_df) <- ds_df$year
   ds_df$year <- NULL
-  names(ds_df) <- "EKE_surface"
+  names(ds_df) <- "EKE"
+  
+  eke_name <- paste0("EKE", stage)
+  colnames(ds_df) <- c(eke_name)
   
   # Clean up only the variables used in the new Xarray workflow
   rm(temp_df, raw_values, r_years, r_months)

@@ -143,54 +143,84 @@ transport_3d <- function(u_dataset, v_dataset, long_dataset, coast_ds, filter_di
   dz_masked <- dz_sliced$where(py_mask) #the values in this are the depth bins
   
   # =========================================================================
-  # 5. THICKNESS-INTEGRATED TRANSPORT & SPATIAL MEAN
+  # 5. THICKNESS & GRID-WIDTH INTEGRATED TRANSPORT (TOTAL VOLUME FLUX in m^3/s)
   # =========================================================================
-  cat("Collapsing water column via high-performance thickness weighting...\n")
-  # 5a. integrating across depth (Interpolate to z_int in Mike's code)
-  ua_integrated <- ua_masked * dz_masked
-  uc_integrated <- uc_masked * dz_masked
+  cat("Integrating water column vertically via summation...\n")
   
-  # 5b. calculating the mean of the vertical profile
-  ua_weighted_vertical_mean <- ua_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
-  uc_weighted_vertical_mean <- uc_integrated$sum(dim = depth_name, skipna = TRUE) / dz_masked$sum(dim = depth_name, skipna = TRUE)
+  # 5a. Integrating across depth: Units change from (m/s) to (m^2/s)
+  ua_depth_integrated <- ua_masked * dz_masked
+  uc_depth_integrated <- uc_masked * dz_masked
   
-  # 5C. calculating means across space 
+  # 5b. Sum across depth to get total vertical water column transport per unit width
+  ua_depth_sum <- ua_depth_integrated$sum(dim = depth_name, skipna = TRUE)
+  uc_depth_sum <- uc_depth_integrated$sum(dim = depth_name, skipna = TRUE)
   
-  horizontal_dims <- py_to_r(py$list(ua_weighted_vertical_mean$dims))
-  spatial_dims_to_drop <- horizontal_dims[horizontal_dims != "time"]
-  cat("Aggregating means across space ...\n")
-  ua_series <- ua_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
-  uc_series <- uc_weighted_vertical_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
+  # 5c. Cast native R grid widths to Xarray DataArrays for spatial integration
+  # Align coordinates to the sliced u_array lat/lon bounds
+  cat("Casting grid sizes to Xarray DataArrays for spatial integration...\n")
+  xr <- import("xarray")
   
-  # =========================================================================
-  # 6. PARSING DATA INTO R DATA FRAMES
-  # =========================================================================
-  cat("Extracting values free of memory overhead...\n")
-  raw_ua <- py_to_r(ua_series$values)
-  raw_uc <- py_to_r(uc_series$values)
-  
-  # this data frame has monthly means
-  temp_df <- data.frame(
-    year = r_years,
-    u_along = raw_ua,
-    u_cross = raw_uc
+  dx_da <- xr$DataArray(
+    data = dx_meters,
+    dims = list("lat", "lon"),
+    coords = list(lat = u_array_aligned$lat$values[1:nrow(dx_meters)], 
+                  lon = u_array_aligned$lon$values[1:ncol(dx_meters)])
   )
   
+  dy_da <- xr$DataArray(
+    data = dy_meters,
+    dims = list("lat"),
+    coords = list(lat = u_array_aligned$lat$values[1:length(dy_meters)])
+  )
+  
+  # 5d. Multiply by horizontal grid widths to get volumetric flux (m^3/s)
+  # Along-shore transport fluxes across the cross-shelf boundary layout (dy)
+  # Cross-shelf transport fluxes across the along-shore boundary layout (dx)
+  ua_volume_flux <- ua_depth_sum * dy_da
+  uc_volume_flux <- uc_depth_sum * dx_da
+  
+  # 5e. Sum across both horizontal dimensions to calculate total transport volume
+  horizontal_dims <- py_to_r(py$list(ua_depth_sum$dims))
+  spatial_dims_to_drop <- horizontal_dims[horizontal_dims != "time"]
+  
+  cat("Summing across spatial domains to compute net volume transport...\n")
+  ua_total_m3s <- ua_volume_flux$sum(dim = spatial_dims_to_drop, skipna = TRUE)
+  uc_total_m3s <- uc_volume_flux$sum(dim = spatial_dims_to_drop, skipna = TRUE)
+  
+  # =========================================================================
+  # 6. PARSING DATA INTO R DATA FRAMES (RAW METERS CUBED PER SECOND)
+  # =========================================================================
+  cat("Extracting values in raw m^3/s...\n")
+  raw_ua_m3s <- py_to_r(ua_total_m3s$values)
+  raw_uc_m3s <- py_to_r(uc_total_m3s$values)
+  
+  # This data frame contains net volumetric monthly transport timelines in m^3/s
+  temp_df <- data.frame(
+    year = r_years,
+    u_along = raw_ua_m3s,
+    u_cross = raw_uc_m3s
+  )
   # =========================================================================    
   # 7. MONTHLY MEANS AND TEMPORAL LAGS
   # =========================================================================
   cat("Aggregating annual timeline numbers in R...\n")
   # 7a. aggregating across months to take a monthly mean
+  ds_df_along <-NA
+  ds_df_cross <-NA
   ds_df_along <- aggregate(u_along ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   ds_df_cross <- aggregate(u_cross ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   # 7b. combining u and v in one dataframe to export
   ds_df <- merge(ds_df_along, ds_df_cross, by = "year")
-  # 7c. if preconditioning is specified, applying a lag
-  if (precond) {
+  # If preconditioning is TRUE, add a 1-year lag to the timeline data index
+  if (precond==TRUE) {
     cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-    ds_df$year <- ds_df$year + 1
+    # In a default pandas to_dataframe() conversion with groupby('time.year'),
+    # the years are stored as the index (rownames) of the R data frame.
+    current_years <- ds_df$year
+    lagged_years <- current_years + 1
+    ds_df$year <- lagged_years
   }
-  
+  # Format column and index headers
   rownames(ds_df) <- ds_df$year
   ds_df$year <- NULL
   

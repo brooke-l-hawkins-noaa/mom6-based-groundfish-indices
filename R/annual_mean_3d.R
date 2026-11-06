@@ -58,6 +58,7 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   
   # 3. since we are doing 3-d data we will now do the same thing with depth
   # this is the primary difference between the 3d and 2d functions
+  
   min_depth <- as.numeric(filter_dict[[stage]][["min_depth"]])
   max_depth <- as.numeric(filter_dict[[stage]][["max_depth"]])
   cat(paste0("Slicing depth dimension (", depth_name, "): ", min_depth, " to ", max_depth, "\n"))
@@ -130,8 +131,8 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   var_masked <- var_array$where(py_mask)
   
   # Mask out layer thickness values where the variable data is null (handles seafloor truncation)
-  # FIXED: Replaced R logic NOT operator (!) with native Python xarray $notnull() function
-  # dz_masked <- dz_sliced$where(var_masked$notnull())
+
+    # dz_masked <- dz_sliced$where(var_masked$notnull())
   
   # This is just a check: Identify remaining spatial dimensions to summarise means over
   # (Modified to handle a two-stage spatial collapse incorporating vertical weights)
@@ -143,44 +144,45 @@ annual_mean_3d <- function(var_dataset, long_dataset, mask_type,  ds_var_name, d
   
   # Step 7a: Calculate the vertical depth-weighted average: sum(var * dz) / sum(dz)
   # This collapses the "z_l" dimension first, turning the data into a 2D spatial plane (time, lat, lon)
+  
   # var_weighted_sum <- (var_masked * dz_masked)$sum(dim = depth_name, skipna = TRUE)
   # dz_sum           <- dz_masked$sum(dim = depth_name, skipna = TRUE)
   # var_depth_mean   <- var_weighted_sum / dz_sum
-  var_depth_mean   <-  var_masked
-  # Step 7b: Identify remaining horizontal spatial dimensions to drop (should be "lat" and "lon")
+ 
+   var_depth_mean   <-  var_masked
+ 
+    # Step 7b: Identify remaining horizontal spatial dimensions to drop (should be "lat" and "lon")
   all_remaining_dims <- py_to_r(py$list(var_depth_mean$dims))
   spatial_dims_to_drop <- all_remaining_dims[all_remaining_dims != "time"]
   
   # Take a standard unweighted horizontal spatial mean across the remaining lat/lon coordinates
   spatial_mean_series <- var_depth_mean$mean(dim = spatial_dims_to_drop, skipna = TRUE)
-  
-  # 8. Pull the monthly means
-  # you now have monthly means across the defined lat long. We need to pull them into
-  # R and align them with the correct time
   cat("Extracting values safe from memory overhead...\n")
   raw_values <- py_to_r(spatial_mean_series$values)
-  
   # Manually construct R data frame with the extracted r_years
   temp_df <- data.frame(
     year = r_years,
     value = raw_values
   )
   
-  # 9. Aggregate annual time series using r
+  
+  # 8. Aggregate annual mean time series using R
   cat("Aggregating annual time series in R...\n")
+  ds_df<- NA # this has to be initiated as empty or you will have a bad time
   ds_df <- aggregate(value ~ year, data = temp_df, FUN = mean, na.rm = TRUE)
   
-  # If preconditioning is TRUE, add a 1-year lag to the timeline data index
-  if (precond) {
-    cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
-     current_years <- as.numeric(ds_df$year)
-    lagged_years <- current_years + 1
-    rownames(ds_df) <- as.character(lagged_years)
-    ds_df$year<-rownames(ds_df)
-  }
   
+  # If preconditioning is TRUE, add a 1-year lag to the timeline data index
+  if (precond==TRUE) {
+    cat("Applying 1-year environmental precondition lag (Years + 1)...\n")
+    # In a default pandas to_dataframe() conversion with groupby('time.year'),
+    # the years are stored as the index (rownames) of the R data frame.
+    current_years <- ds_df$year
+    lagged_years <- current_years + 1
+    ds_df$year <- lagged_years
+  }
   # Format column and index headers
-  #rownames(ds_df) <- ds_df$year
+  rownames(ds_df) <- ds_df$year
   ds_df$year <- NULL
   names(ds_df) <- df_var_name
   

@@ -1,0 +1,294 @@
+---
+title: "Yellowtail_variables"
+format: pdf
+editor: visual
+---
+
+# Setup
+
+```{r}
+# Check current working directory
+devtools::load_all(here::here())
+library(dplyr)
+library(ncdf4)
+library(tidyr)
+library(corrplot)
+library(rerddap)
+library(ggplot2)
+library(rerddap)
+library(ggplot2)
+library(lubridate)
+library(rerddap)
+library(purrr)
+library(stringr)
+library(reticulate)
+```
+
+Next, we need to set up our python environment for reticulate and make sure it is calling the correct version of icechunk and arraylake to be able to interact with Eartmover. Reticulate automatically loads an environment when you start a new session and ensuring the python environment you are using with reticulate is correctly specifying the correct version of python and the Earthmover associated packages is key.
+
+```{r}
+# Force reticulate to pull down the newest package versions
+#reticulate::py_install("dask")
+py_require("icechunk>=2.0.0")
+py_require("arraylake>=1.0.0")
+py_require("zarr")
+py_require("h5netcdf")
+py_require("h5py")
+py_require("xarray")
+py_require("scipy")
+py_require("dask")
+# Import the fresh libraries
+arraylake <- import("arraylake") #the data visual layer of Earthmover
+zarr <- import("zarr") #interact with compressed data chunks and JSON metadata
+xr   <- import("xarray") #python library for working with arrays
+np   <- np <- import("numpy", convert = FALSE) #necessary for the NaN checking block
+pd   <- import("pandas")
+time <- import("time")
+dask <- import("dask")
+
+# Verify the version 
+print(arraylake$`__version__`) 
+```
+
+Now we will load the data from Earthmover and a static .netcdf. Whether or not this loads correctly will identify whether the python environment is loaded correctly in R and may require trounblshooting
+
+```{r}
+# Connect to your NOAA data repository
+client <- arraylake$Client()
+#token issue? go to terminal arraylake auth login
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly") 
+print(repo)
+
+# did you get an authentication error? if so run the login code below to 
+# reauthenticate and follow the login prompts
+# client$login() 
+#If this runs then Earthmover is functioning!
+
+ds_depth = xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+
+#If this runs then xarray has appropriate dependencies loaded
+
+```
+
+```{r}
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+# ths is pulled directly from Brooke's code just adding isobath
+lifestage_dict = list(
+    cop = list( #copulation
+        min_month= 8,
+        max_month= 10,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 90,
+        max_depth= 180,
+        min_iso = 1,
+        max_iso=1200
+    ), 
+    part= list( # partuition
+        min_month= 1,
+        max_month= 4,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 0,
+        max_depth= 180,
+        min_iso = 1,
+        max_iso=1200
+    ),
+    larv= list( # larvae
+        min_month= 2,
+        max_month= 3,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 0,
+        max_depth= 90,
+        min_iso = 1,
+        max_iso=1200
+    ),
+    pjuv= list( # pelagic juvenile
+        min_month= 4,
+        max_month= 8,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 30,
+        max_depth= 130,
+        min_iso = 1,
+        max_iso=1200
+    )
+)
+```
+
+When comparing the two models, there was a bug in the MOM6 code that resulted in the depth bins being used to define the longitudinal extent. To test whether the functions are performing correctly, I am using an alternative life-history pointer to make sure that the comparison are identical.
+
+```{r}
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+# assign months, latitudes, and depths to filter
+# all are integers, depths are in meters
+# filters are inclusive (closed interval), e.g. depth 0-180 includes depths 0 and 180 and every depth between
+
+# ths is pulled directly from Brooke's code just adding isobath
+lifestage_dict_comparison = list(
+    cop = list( #copulation
+        min_month= 8,
+        max_month= 10,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 90,
+        max_depth= 180,
+        min_iso = 90,
+        max_iso=180
+    ), 
+    part= list( # partuition
+        min_month= 1,
+        max_month= 4,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 0,
+        max_depth= 180,
+        min_iso = 0,
+        max_iso=180
+    ),
+    larv= list( # larvae
+        min_month= 2,
+        max_month= 3,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 0,
+        max_depth= 90,
+        min_iso = 0,
+        max_iso=90
+    ),
+    pjuv= list( # pelagic juvenile
+        min_month= 4,
+        max_month= 8,
+        min_lat= 40,
+        max_lat= 48,
+        min_depth= 30,
+        max_depth= 130,
+        min_iso = 30,
+        max_iso=130
+    )
+)
+```
+
+```{r echo=FALSE}
+
+# 1. Load local NetCDF datasets using xarray
+# depth is used to filter longitudinal extent based on isobath
+ds_depth <- xr$open_dataset("../STATIC/ocean_static.deptho.nc")
+# depth is used to filter longitudinal extent based on distance from shore
+# 1. Open the raw file
+ds_dist_raw <- xr$open_dataset("../STATIC/mom6-nep_regrid_dist2coast_CCS.nc")
+
+# 2. Safely isolate the true geographic decimal vectors from the 2D matrix arrays
+# Since they are stored as variables, we can extract the true linear coordinates
+true_lat_vector <- py_to_r(ds_dist_raw[["lat"]]$values[, 1])
+true_lon_vector_raw <- py_to_r(ds_dist_raw[["lon"]]$values[1, ])
+
+# 3. Convert Longitude map from (-180 to 180) into (0 to 360) global scale
+# This ensures that -125 degrees west maps to 235 degrees global
+true_lon_vector <- (true_lon_vector_raw %% 360)
+
+# 4. Wipe out the old placeholder data variables to prevent name collisions
+ds_dist_clean <- ds_dist_raw$drop_vars(list("lat", "lon"))
+
+# 5. Overwrite the generic index coordinates with your true geographical decimals
+ds_dist_assigned <- ds_dist_clean$assign_coords(list(
+  latitude = true_lat_vector,
+  longitude = true_lon_vector
+))
+
+# 6. Standardize the dimension labels to match your main data exactly
+ds_dist <- ds_dist_assigned$rename(list(latitude = "lat", longitude = "lon"))
+
+# Verify the changes (You will see active asterisks * next to true decimal coordinates!)
+print(ds_dist)
+```
+
+```{r echo=FALSE}
+
+# 2. Connect to Earthmover Arraylake
+client <- arraylake$Client()
+repo <- client$get_repo("NOAA-PMEL/cefi-nep-hindcast-monthly")
+session <- repo$readonly_session(branch = "main")
+
+# Load aux group Zarr data - this is data that is not a direct main output (it is calculated from model output)
+aux <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/aux1")
+# Load the main group Zarr data 
+main <- xr$open_zarr(session$store, zarr_format = 3L, group = "regrid/main")
+# Use list() to match Python's double bracket [['MLD_003']] dataset subsetting
+ds_mld <- aux[list("MLD_003")]
+ds_temp = main[list('thetao')]
+ds_xv = main[list('uo_rotate')]
+ds_yv = main[list('vo_rotate')]
+ds_ssh = aux[list('ssh')]
+
+```
+
+Lets start with data that is 2-dimensional using the 2-d function, this is primarily MLD and SSH
+
+```{r echo=FALSE}
+devtools::load_all(here::here())
+
+MLDpart = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDpart", lifestage_dict, 'part',precond=FALSE, TRUE)  # 1993 should = 47.29985 check if correct...
+
+MLDlarv = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDlarv", lifestage_dict, 'larv', precond=FALSE, TRUE)
+
+MLDpjuv = annual_mean_2d(ds_mld, ds_depth,"isobath", "MLD_003", "MLDpjuv", lifestage_dict, 'pjuv',precond=FALSE, TRUE)
+
+dim2 <- list(MLDpjuv, MLDlarv, MLDpart)
+updated_list <- map(dim2, ~ tibble::rownames_to_column(.x, var = "year"))
+
+transport_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(model="MOM6", year=as.numeric(year))
+```
+
+```{r echo=FALSE}
+devtools::load_all(here::here())
+
+TEMPcop = annual_mean_3d_depthweighted(ds_temp, ds_depth, "isobath","thetao", "Tcop", lifestage_dict, 'cop',TRUE,TRUE)
+
+TEMPpart = annual_mean_3d_depthweighted(ds_temp, ds_depth, "isobath","thetao", "Tpart", lifestage_dict, 'part',FALSE,TRUE)
+
+threed.ls <- list(TEMPcop,TEMPpart)
+updated_list <- map(threed.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+temp_df <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(year=as.numeric(year))#%>%
+  #left_join(transport_df)
+
+#write.csv(temp_df2, "Output/YellowtailMOM6_depthweighted.csv")
+```
+
+
+
+```{r echo=FALSE}
+
+CSTlarv = annual_mean_3d_depthweighted(ds_xv, ds_depth, "isobath","uo_rotate", "CSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
+
+CSTpjuv = annual_mean_3d_depthweighted(ds_xv, ds_depth, "isobath","uo_rotate", "CSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
+
+LSTlarv = annual_mean_3d_depthweighted(ds_yv, ds_depth, "isobath","vo_rotate", "LSTlarv", lifestage_dict, 'larv',FALSE,TRUE)
+
+LSTpjuv = annual_mean_3d_depthweighted(ds_yv, ds_depth, "isobath","vo_rotate", "LSTpjuv", lifestage_dict, 'pjuv',FALSE,TRUE)
+
+ threed.ls <- list(LSTpjuv,LSTlarv,CSTlarv,CSTpjuv)
+updated_list <- map(threed.ls, ~ tibble::rownames_to_column(.x, var = "year"))
+
+temp_df2 <- updated_list %>% 
+  reduce(left_join, by = "year")%>%
+  mutate(year=as.numeric(year))%>%
+  left_join(temp_df)
+
+```

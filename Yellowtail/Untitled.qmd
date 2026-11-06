@@ -1,0 +1,138 @@
+---
+title: "YellowtailComparison"
+format: pdf
+editor: visual
+---
+
+
+```{r echo=FALSE}
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")
+mom6<-read.csv("Output/YellowtailMOM6_COMPARISON.csv")
+glorys<-read.csv("yellowtail_GLORYs.csv")%>%
+  mutate(model="GLORYS")
+
+mom6alt_long<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+glorys_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+
+mom6_long<-mom6%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6alt_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_roms= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_roms),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+
+unstandardized<-ggplot(data=mom6_alt, aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+
+mom6_roms_stand<-mom6_alt%>%
+  group_by(model, variable)%>%
+  group_by(model)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()%>%
+  left_join(data.frame(mom6_alt_corr))
+  
+  standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable)+
+  ggtitle("Standardized")+
+  geom_text(aes(x = 2010, y = 2, label =corr) )+
+  theme_classic()
+   standardized
+```
+
+
+```{r echo=FALSE}
+mom6alt<-read.csv("yellowtail_MOM6.csv")%>%
+  mutate(model="MOM6v2")
+mom6<-read.csv("Output/YellowtailMOM6.csv")
+glorys<-read.csv("yellowtail_GLORYs.csv")%>%
+  mutate(model="GLORYS")
+
+mom6alt_long<-mom6alt%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+glorys_long<-glorys%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )
+
+
+mom6_long<-mom6%>%pivot_longer(
+    cols =-c(year, model),       
+    names_to = "variable", 
+    values_to = "values"  
+  )%>%filter(year>=1994&year<=2023)
+
+mom6_alt<-mom6_long%>%
+  bind_rows(mom6alt_long)%>%
+  bind_rows(glorys_long)%>%
+  filter(variable %in% intersect(unique(mom6_long$variable), unique(mom6alt_long$variable)))
+
+mom6_alt_corr<-mom6_long%>%select(-model)%>%
+  rename(mom6_values=values)%>%
+  inner_join(mom6alt_long)%>%#select(-model)%>%
+  group_by(variable,model)%>%
+   mutate(standardized_mom6= scale(mom6_values),standardized_mom6alt= scale(values))%>%
+   summarise(
+     correlation = cor(standardized_mom6, standardized_mom6alt),
+     .groups = "drop"
+   )%>%
+   mutate(corr=round(correlation, 3))
+
+
+unstandardized<-ggplot(data=mom6_alt, aes(x=year, y=values,col=model))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Unstandardized")+
+  theme_classic()
+
+
+mom6_roms_stand<-mom6_alt%>%
+  group_by(model, variable)%>%
+  mutate(standardized_values= scale(values))%>%
+  ungroup()%>%
+  left_join(data.frame(mom6_alt_corr))
+  
+  standardized<-ggplot(data=mom6_roms_stand, aes(x=year, y=standardized_values,col=model, label=corr))+
+  geom_line()+
+  facet_wrap(~variable, scales = "free_y")+
+  ggtitle("Standardized")+
+  geom_text(aes(x = 2010, y = 2, label =corr) )+
+  theme_classic()
+   standardized
+```
